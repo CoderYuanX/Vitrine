@@ -28,7 +28,7 @@ Rectangle {
         }
         Text { text: "桌面小组件"; color: "#2b3344"; font.pixelSize: 15
             font.weight: Font.DemiBold; font.letterSpacing: 0.2
-            font.family: "PingFang SC, Microsoft YaHei, Noto Sans CJK SC"
+            font.family: "PingFang SC,Microsoft YaHei,Noto Sans CJK SC"
             anchors.verticalCenter: parent.verticalCenter }
     }
 

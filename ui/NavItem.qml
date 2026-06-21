@@ -31,7 +31,7 @@ Rectangle {
         case "system":
             return '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M9 20.5h6M12 16.5v4" stroke-linecap="round"/>'
         case "note":
-            return '<path d="M5 3.5h10l4 4v13a0 0 0 0 1 0 0H5a0 0 0 0 1 0 0Z" stroke-linejoin="round"/><path d="M14.5 3.5V8h4.2M8 13h8M8 16.5h5" stroke-linecap="round"/>'
+            return '<path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/>'
         case "settings":
             return '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.5M12 19v2.5M4.2 7l2.2 1.3M17.6 15.7l2.2 1.3M4.2 17l2.2-1.3M17.6 8.3l2.2-1.3" stroke-linecap="round"/>'
         default:
@@ -59,7 +59,7 @@ Rectangle {
             text: item.label
             anchors.verticalCenter: parent.verticalCenter
             font.pixelSize: 14; font.weight: Font.Medium
-            font.family: "PingFang SC, Microsoft YaHei, Noto Sans CJK SC"
+            font.family: "PingFang SC,Microsoft YaHei,Noto Sans CJK SC"
             color: item.iconColor
         }
     }

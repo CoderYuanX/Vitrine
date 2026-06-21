@@ -10,9 +10,6 @@ Window {
     flags: Qt.FramelessWindowHint | Qt.Window
     title: "桌面小组件"
 
-    // Global font family for CJK text
-    readonly property string uiFont: "PingFang SC, Microsoft YaHei, Noto Sans CJK SC"
-
     Rectangle {                          // 外层淡蓝渐变背景
         anchors.fill: parent
         gradient: Gradient {
