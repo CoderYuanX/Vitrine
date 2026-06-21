@@ -3,6 +3,7 @@
 > 玻璃质感、macOS 风格的 Linux 桌面小组件管理器，基于 **PySide6 + Qt Quick / QML** 构建。
 
 <p>
+  <a href="https://github.com/CoderYuanX/Vitrine/releases/latest"><img alt="下载" src="https://img.shields.io/github/v/release/CoderYuanX/Vitrine?label=%E4%B8%8B%E8%BD%BD%20.deb&color=2f6bff&logo=debian&logoColor=white"></a>
   <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
   <img alt="PySide6" src="https://img.shields.io/badge/PySide6-6.8-41CD52?logo=qt&logoColor=white">
   <img alt="平台" src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Linux%20%C2%B7%20Deepin%2FX11-blue">
