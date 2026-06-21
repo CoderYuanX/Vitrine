@@ -38,8 +38,28 @@ Window {
                 Row {
                     width: parent.width; height: parent.height - 56
                     Sidebar { id: sideArea; height: parent.height }
-                    Rectangle { id: contentArea; width: parent.width - 186; height: parent.height; color: "#fbfcfe"
-                        Text { anchors.centerIn: parent; text: "内容区"; color: "#aaa" } }
+                    Rectangle {
+                        id: contentArea
+                        width: parent.width - 186; height: parent.height; color: "#fbfcfe"
+                        Flow {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            anchors.leftMargin: 20; anchors.rightMargin: 20
+                            spacing: 14
+                            Repeater {
+                                model: catalog.visibleWidgets
+                                GalleryCard {
+                                    width: (contentArea.width - 40 - 14) / 2
+                                    height: 168
+                                    wid: modelData.id
+                                    title: modelData.name
+                                    widgetEnabled: modelData.enabled
+                                    implemented: modelData.implemented
+                                    previewQml: modelData.previewQml
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

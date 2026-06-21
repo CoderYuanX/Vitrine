@@ -52,13 +52,23 @@ Item {
             TapHandler { onTapped: catalog.toggle(cardRoot.wid, !cardRoot.widgetEnabled) }
         }
 
-        // 预览/占位槽,Task 11/12 填充
+        // 预览/占位槽
         Loader {
             id: bodyLoader
             anchors.left: parent.left; anchors.right: parent.right
             anchors.top: parent.top; anchors.topMargin: 44
             anchors.bottom: parent.bottom
             anchors.leftMargin: 17; anchors.rightMargin: 17; anchors.bottomMargin: 15
+            source: cardRoot.implemented && cardRoot.previewQml ? cardRoot.previewQml : ""
+            onStatusChanged: if (status === Loader.Error) errorText.visible = true
+        }
+
+        // 加载失败提示
+        Text {
+            id: errorText
+            anchors.centerIn: bodyLoader
+            visible: false
+            text: "加载失败"; color: "#aab2c0"; font.pixelSize: 13
         }
 
         // "即将推出"占位(仅 not implemented 时可见)
