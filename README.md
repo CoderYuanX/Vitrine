@@ -63,6 +63,17 @@ python main.py
 
 依赖：`PySide6>=6.6`、`psutil`、`requests`、`python-xlib`（Linux）。
 
+### 打包为 .deb（Deepin / Debian 系）
+
+提供自包含打包脚本，把应用 + 内置 PySide6 虚拟环境装进 `/opt/vitrine`，装上即用：
+
+```bash
+packaging/build-deb.sh                 # 产出 dist/vitrine_0.1.0_amd64.deb
+sudo apt install ./dist/vitrine_0.1.0_amd64.deb
+```
+
+装好后启动器搜索「Vitrine 桌面小组件」或终端运行 `vitrine`。详见 [packaging/README.md](packaging/README.md)。
+
 ## 🖱️ 使用
 
 应用启动后**常驻系统托盘**，主窗口不会自动弹出：
