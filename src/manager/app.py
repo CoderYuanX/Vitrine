@@ -29,6 +29,9 @@ class ManagerApp:
         self.runtime = WidgetRuntime(self.app, self.widgets, self.config, self.layout_bridge)
         self.manager_engine = None   # Task 7 填充
 
+        from .catalog_bridge import CatalogBridge
+        self.catalog = CatalogBridge(self.runtime, self.widgets, quit_fn=self.app.quit)
+
     def run(self):
         self.runtime.bootstrap(DEFAULT_ON)
         from .tray import build_tray
@@ -36,5 +39,14 @@ class ManagerApp:
         return self.app.exec()
 
     def open_manager(self):
-        # Task 7 实现:创建/显示管理窗口
-        pass
+        from PySide6.QtCore import QUrl
+        from PySide6.QtQml import QQmlApplicationEngine
+        if self.manager_engine is None:
+            eng = QQmlApplicationEngine()
+            eng.rootContext().setContextProperty("catalog", self.catalog)
+            eng.load(QUrl.fromLocalFile(str(PROJECT_ROOT / "ui" / "Manager.qml")))
+            if not eng.rootObjects():
+                return
+            self.manager_engine = eng
+        win = self.manager_engine.rootObjects()[0]
+        win.show(); win.raise_(); win.requestActivate()
