@@ -13,6 +13,12 @@
   <img src="docs/screenshots/manager.png" alt="Vitrine 管理面板" width="820">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/calendar-expanded.png" alt="日历组件 · 展开仪表盘" width="820">
+  <br>
+  <sub>日历组件 · 展开仪表盘:本地可编辑事件、月份翻页、当日日程</sub>
+</p>
+
 ---
 
 ## ✨ 特性
