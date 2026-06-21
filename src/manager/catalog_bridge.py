@@ -44,6 +44,11 @@ class CatalogBridge(QObject):
             self._active = key
             self.changed.emit()
 
+    @Slot(str, bool)
+    def toggle(self, wid, on):
+        self._runtime.set_enabled(wid, on)
+        self.changed.emit()
+
     def _get_active(self):
         return self._active
 

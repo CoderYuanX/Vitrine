@@ -48,3 +48,19 @@ def test_categories_list():
     b = CatalogBridge(FakeRuntime(), WIDGETS)
     keys = [c["key"] for c in b.categories]
     assert keys == ["all", "clock", "weather", "calendar", "system", "note"]
+
+
+def test_toggle_calls_runtime_and_updates():
+    rt = FakeRuntime()
+    b = CatalogBridge(rt, WIDGETS)
+    b.toggle("clock", True)
+    assert rt.calls == [("clock", True)]
+    clock = next(w for w in b._visible() if w["id"] == "clock")
+    assert clock["enabled"] is True
+
+
+def test_toggle_off():
+    rt = FakeRuntime(shown=["clock"])
+    b = CatalogBridge(rt, WIDGETS)
+    b.toggle("clock", False)
+    assert rt.calls == [("clock", False)]
