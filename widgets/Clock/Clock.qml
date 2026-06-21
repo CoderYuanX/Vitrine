@@ -12,7 +12,8 @@ Window {
     visible: true
     color: "transparent"
     title: "deepin-widget-clock"
-    flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus
+    // Qt.Tool:桌面挂件不进任务栏(映射即排除,无 200ms 缺口,不依赖 dock 是否认 skip-taskbar)
+    flags: Qt.FramelessWindowHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus
 
     function persist() { layout.saveState(widgetId, root.x, root.y, root.zoom) }
 

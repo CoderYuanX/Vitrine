@@ -53,7 +53,8 @@ Window {
     visible: true
     color: "transparent"
     title: "deepin-widget-calendar"
-    flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus
+    // Qt.Tool:桌面挂件不进任务栏(映射即排除,无 200ms 缺口,不依赖 dock 是否认 skip-taskbar)
+    flags: Qt.FramelessWindowHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus
 
     // 演示任务模型(可切换 done,会话内)
     ListModel { id: taskStore }
