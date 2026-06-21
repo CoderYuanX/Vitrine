@@ -5,7 +5,7 @@ Item {
     id: cardRoot
     property string wid: ""
     property string title: ""
-    property bool enabled: false
+    property bool widgetEnabled: false
     property bool implemented: true
     property string previewQml: ""
 
@@ -43,13 +43,13 @@ Item {
             anchors.top: parent.top; anchors.topMargin: 15
             visible: cardRoot.implemented
             Rectangle { anchors.fill: parent; radius: 10
-                color: cardRoot.enabled ? "#3b82f6" : "transparent"
-                border.width: cardRoot.enabled ? 0 : 1.6
+                color: cardRoot.widgetEnabled ? "#3b82f6" : "transparent"
+                border.width: cardRoot.widgetEnabled ? 0 : 1.6
                 border.color: "#ced6e2" }
-            Canvas { anchors.fill: parent; visible: cardRoot.enabled
+            Canvas { anchors.fill: parent; visible: cardRoot.widgetEnabled
                 onPaint: { var c=getContext("2d"); c.strokeStyle="#fff"; c.lineWidth=2.2; c.lineCap="round"; c.lineJoin="round"
                     c.beginPath(); c.moveTo(5.8,10.3); c.lineTo(8.6,13.0); c.lineTo(14.2,7.5); c.stroke() } }
-            TapHandler { onTapped: catalog.toggle(cardRoot.wid, !cardRoot.enabled) }
+            TapHandler { onTapped: catalog.toggle(cardRoot.wid, !cardRoot.widgetEnabled) }
         }
 
         // 预览/占位槽,Task 11/12 填充

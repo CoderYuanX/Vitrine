@@ -20,7 +20,7 @@ Window {
             GalleryCard {
                 wid: "clock"
                 title: "时钟"
-                enabled: true
+                widgetEnabled: true
                 implemented: true
                 width: 380
                 height: 168
@@ -29,7 +29,7 @@ Window {
             GalleryCard {
                 wid: "weather"
                 title: "天气"
-                enabled: false
+                widgetEnabled: false
                 implemented: false
                 width: 380
                 height: 168
