@@ -112,6 +112,35 @@ def test_manual_city_geocodes_then_fetches(tmp_path):
     assert all("ip-api.com" not in c[0] for c in session.calls)
 
 
+def test_status_ok_when_city_found(tmp_path):
+    session = _Session([
+        _Resp({"results": [{"name": "上海", "admin1": "上海市", "country": "中国",
+                            "latitude": 31.2, "longitude": 121.5}]}),
+        _Resp({"current": {"temperature_2m": 22, "relative_humidity_2m": 70, "weather_code": 2},
+               "daily": {"temperature_2m_max": [25], "temperature_2m_min": [18]}}),
+    ])
+    provider = WeatherProvider(session=session, cache_path=tmp_path / "w.json",
+                               settings=lambda: {"autoLocate": False, "city": "上海"})
+    provider.current()
+    assert provider.last_status == "ok"
+
+
+def test_status_notfound_for_unknown_city(tmp_path):
+    session = _Session([_Resp({"results": []})])  # 地理编码无结果
+    provider = WeatherProvider(session=session, cache_path=tmp_path / "w.json",
+                               settings=lambda: {"autoLocate": False, "city": "qwertyxyz"})
+    data = provider.current()
+    assert provider.last_status == "notfound"
+    assert data["city"] == "北京"  # 无缓存 → FALLBACK
+
+
+def test_status_disabled_when_no_city(tmp_path):
+    provider = WeatherProvider(session=_Session([]), cache_path=tmp_path / "w.json",
+                               settings=lambda: {"autoLocate": False, "city": ""})
+    provider.current()
+    assert provider.last_status == "disabled"
+
+
 def test_disabled_without_city_skips_network(tmp_path):
     provider = WeatherProvider(
         session=_Session([RuntimeError("不应联网")]),

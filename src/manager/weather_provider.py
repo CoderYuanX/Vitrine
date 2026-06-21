@@ -12,6 +12,10 @@ IP_API_URL = (
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
+
+class CityNotFound(Exception):
+    """手填城市在地理编码服务里查无结果。"""
+
 WEATHER_CODES = {
     0: "晴朗",
     1: "晴朗",
@@ -63,6 +67,8 @@ class WeatherProvider:
         self.timeout = timeout
         # 返回 {"autoLocate": bool, "city": str};默认自动定位、无手填城市
         self._settings = settings or (lambda: {"autoLocate": True, "city": ""})
+        # 最近一次取数状态:ok / notfound / disabled / fallback,供 UI 反馈
+        self.last_status = "idle"
 
     @staticmethod
     def _key(auto, city):
@@ -81,6 +87,7 @@ class WeatherProvider:
         fresh = cached and time.time() - cached.get("_fetchedAt", 0) < self.ttl_seconds
         key_ok = cached and cached.get("_key", key) == key  # 无 _key 视为旧版缓存,放行
         if fresh and key_ok:
+            self.last_status = "ok"
             return self._public(cached)
         try:
             if auto:
@@ -89,13 +96,19 @@ class WeatherProvider:
                 location = self._geocode(city)
             else:
                 # 关闭自动定位且未填城市:不联网
+                self.last_status = "disabled"
                 return self._public(cached) if key_ok else dict(FALLBACK)
             weather = self._fetch_weather(location["lat"], location["lon"])
             data = self._build(location, weather)
             data["_key"] = key
             self._save_cache(data)
+            self.last_status = "ok"
             return self._public(data)
+        except CityNotFound:
+            self.last_status = "notfound"
+            return self._public(cached) if key_ok else dict(FALLBACK)
         except Exception:
+            self.last_status = "fallback"
             if key_ok:
                 return self._public(cached)
             return dict(FALLBACK)
@@ -123,7 +136,7 @@ class WeatherProvider:
         resp.raise_for_status()
         results = (resp.json() or {}).get("results") or []
         if not results:
-            raise RuntimeError(f"city not found: {city}")
+            raise CityNotFound(city)
         r = results[0]
         return {
             "city": str(r.get("name") or city),

@@ -21,9 +21,9 @@ Item {
                 TapHandler { onTapped: catalog.setAutostart(!catalog.autostartEnabled) } }
         }
 
-        // 天气
+        // 位置
         Column { spacing: 10
-            Text { text: "天气"; color: "#222c43"; font.pixelSize: 15; font.weight: Font.Bold }
+            Text { text: "位置"; color: "#222c43"; font.pixelSize: 15; font.weight: Font.Bold }
 
             Row { spacing: 10
                 Text { text: "自动定位(按 IP)"; color: "#5b6472"; font.pixelSize: 14
@@ -63,10 +63,22 @@ Item {
                 }
             }
 
+            // 状态提示:让用户知道城市是否找到
             Text {
-                visible: weather.autoLocate
-                text: "关闭自动定位后改用手填城市;关闭后不再上报 IP 位置。"
-                color: "#9aa4b4"; font.pixelSize: 11
+                width: 300
+                wrapMode: Text.WordWrap
+                property string s: weather.locationStatus
+                text: weather.autoLocate
+                        ? "自动按 IP 定位;关闭后可手填城市,且不再上报 IP 位置。"
+                      : s === "loading" ? "正在查询…"
+                      : s === "notfound" ? "✗ 未找到该城市,换个名称试试(支持拼音/英文)"
+                      : (s === "ok" && weather.manualCity) ? ("✓ 已定位:" + weather.cityFull)
+                      : !weather.manualCity ? "未填城市,天气暂不更新。"
+                      : ""
+                color: s === "notfound" ? "#ef4444"
+                     : (s === "ok" && weather.manualCity && !weather.autoLocate) ? "#16a34a"
+                     : "#9aa4b4"
+                font.pixelSize: 11
             }
         }
 

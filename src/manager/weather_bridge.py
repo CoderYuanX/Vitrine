@@ -10,6 +10,7 @@ class WeatherBridge(QObject):
 
     changed = Signal()
     settingsChanged = Signal()
+    statusChanged = Signal()
     _loaded = Signal(dict)
 
     def __init__(self, config=None, provider=None, refresh_minutes=30):
@@ -17,6 +18,7 @@ class WeatherBridge(QObject):
         self._config = config
         self._provider = provider or WeatherProvider(settings=self._prefs)
         self._data = dict(FALLBACK)
+        self._status = "idle"   # idle / loading / ok / notfound / disabled / fallback
         self._loading = False
         self._loaded.connect(self._apply)
         self._timer = QTimer(self)
@@ -37,7 +39,8 @@ class WeatherBridge(QObject):
 
         def run():
             try:
-                data = self._provider.current()
+                data = dict(self._provider.current())
+                data["_status"] = self._provider.last_status
             finally:
                 self._loading = False
             self._loaded.emit(data)
@@ -46,8 +49,17 @@ class WeatherBridge(QObject):
 
     @Slot(dict)
     def _apply(self, data):
+        status = data.pop("_status", None)
         self._data.update(data)
+        if status is not None and status != self._status:
+            self._status = status
+            self.statusChanged.emit()
         self.changed.emit()
+
+    def _set_loading(self):
+        if self._status != "loading":
+            self._status = "loading"
+            self.statusChanged.emit()
 
     # ---- 设置(自动定位 / 手填城市)----
     def _prefs(self):
@@ -60,6 +72,7 @@ class WeatherBridge(QObject):
         if self._config is not None:
             self._config.set_weather(auto_locate=bool(on))
         self.settingsChanged.emit()
+        self._set_loading()
         self.refresh()
 
     @Slot(str)
@@ -67,10 +80,12 @@ class WeatherBridge(QObject):
         if self._config is not None:
             self._config.set_weather(city=(city or "").strip())
         self.settingsChanged.emit()
+        self._set_loading()
         self.refresh()
 
     autoLocate = Property(bool, lambda self: self._prefs()["autoLocate"], notify=settingsChanged)
     manualCity = Property(str, lambda self: self._prefs()["city"], notify=settingsChanged)
+    locationStatus = Property(str, lambda self: self._status, notify=statusChanged)
 
     city = Property(str, lambda self: self._data["city"], notify=changed)
     cityFull = Property(str, lambda self: self._data["cityFull"], notify=changed)
