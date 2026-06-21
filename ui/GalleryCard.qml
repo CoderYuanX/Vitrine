@@ -33,7 +33,7 @@ Item {
         // 头部:卡片名称(锚定版)
         Text { id: nameText
             text: cardRoot.title; color: "#8a93a3"; font.pixelSize: 13; font.weight: Font.DemiBold
-            font.family: "PingFang SC,Microsoft YaHei,Noto Sans CJK SC"
+
             anchors.left: parent.left; anchors.leftMargin: 17
             anchors.top: parent.top; anchors.topMargin: 15 }
 
@@ -70,7 +70,7 @@ Item {
             anchors.centerIn: bodyLoader
             visible: false
             text: "加载失败"; color: "#aab2c0"; font.pixelSize: 13
-            font.family: "PingFang SC,Microsoft YaHei,Noto Sans CJK SC"
+
         }
 
         // "即将推出"占位(仅 not implemented 时可见)
@@ -78,7 +78,7 @@ Item {
             anchors.centerIn: bodyLoader
             visible: !cardRoot.implemented
             text: "即将推出"; color: "#aab2c0"; font.pixelSize: 13
-            font.family: "PingFang SC,Microsoft YaHei,Noto Sans CJK SC"
+
         }
     }
 }

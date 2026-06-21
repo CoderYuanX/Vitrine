@@ -43,6 +43,8 @@ class MockCatalog(QObject):
 if __name__ == "__main__":
     fmt = QSurfaceFormat.defaultFormat(); fmt.setAlphaBufferSize(8); QSurfaceFormat.setDefaultFormat(fmt)
     app = QApplication(sys.argv)
+    from PySide6.QtGui import QFont
+    _font = QFont(); _font.setFamilies(["PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC"]); app.setFont(_font)
     from PySide6.QtQml import QQmlApplicationEngine
     eng = QQmlApplicationEngine()
     eng.rootContext().setContextProperty("catalog", MockCatalog())

@@ -59,7 +59,7 @@ Rectangle {
             text: item.label
             anchors.verticalCenter: parent.verticalCenter
             font.pixelSize: 14; font.weight: Font.Medium
-            font.family: "PingFang SC,Microsoft YaHei,Noto Sans CJK SC"
+
             color: item.iconColor
         }
     }

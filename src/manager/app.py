@@ -2,10 +2,13 @@ import sys
 import signal
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QSurfaceFormat
+from PySide6.QtGui import QSurfaceFormat, QFont
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ON = {"clock"}
+# 字体优先级回退:QML 的 font.families 在本机 PySide6 不可用,改在应用级用 QFont.setFamilies 设置,
+# QML Text 继承此族(各自仍可覆盖 pixelSize/weight)。Deepin 上解析到 Noto Sans CJK SC。
+UI_FONT_FAMILIES = ["PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC"]
 
 
 class ManagerApp:
@@ -17,6 +20,9 @@ class ManagerApp:
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         self.app.setApplicationName("deepin-widgets")
         self.app.setQuitOnLastWindowClosed(False)
+        _font = QFont()
+        _font.setFamilies(UI_FONT_FAMILIES)
+        self.app.setFont(_font)
 
         from .registry import WidgetRegistry
         from .config_store import ConfigStore

@@ -19,7 +19,7 @@ sys.path.insert(0, str(_here))
 
 from PySide6.QtWidgets import QApplication  # QApplication (not QGuiApplication) so QtQuick.Controls-backed types also work
 from PySide6 import QtQuick  # MUST import before loading so root is typed QQuickWindow
-from PySide6.QtGui import QSurfaceFormat
+from PySide6.QtGui import QSurfaceFormat, QFont
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import QTimer, QUrl
 
@@ -36,6 +36,9 @@ _fmt = QSurfaceFormat.defaultFormat()
 _fmt.setAlphaBufferSize(8)
 QSurfaceFormat.setDefaultFormat(_fmt)
 app = QApplication(sys.argv[:1])
+_font = QFont()
+_font.setFamilies(["PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC"])
+app.setFont(_font)
 eng = QQmlApplicationEngine()
 mock = MockCatalog()
 eng.rootContext().setContextProperty("catalog", mock)
