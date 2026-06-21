@@ -41,7 +41,14 @@ Window {
                     Rectangle {
                         id: contentArea
                         width: parent.width - 186; height: parent.height; color: "#fbfcfe"
+                        Loader {
+                            anchors.fill: parent; anchors.margins: 20
+                            active: catalog.activeCategory === "settings"
+                            visible: active
+                            source: "SettingsPanel.qml"
+                        }
                         Flow {
+                            visible: catalog.activeCategory !== "settings"
                             anchors.fill: parent
                             anchors.margins: 18
                             anchors.leftMargin: 20; anchors.rightMargin: 20
