@@ -65,10 +65,15 @@ python main.py
 
 ### 打包为 .deb（Deepin / Debian 系）
 
-提供自包含打包脚本，把应用 + 内置 PySide6 虚拟环境装进 `/opt/vitrine`，装上即用：
+提供打包脚本，应用装到 `/opt/vitrine`。Deepin 源无 PySide6，故依赖随包走，两种模式:
 
 ```bash
-packaging/build-deb.sh                 # 产出 dist/vitrine_0.1.0_amd64.deb
+# 瘦包(~26KB,推荐):安装时联网 pip 拉依赖
+packaging/build-deb.sh --thin
+sudo apt install ./dist/vitrine_0.1.0-thin_amd64.deb
+
+# 自包含(~52MB):deb 内置 venv,离线即装即用
+packaging/build-deb.sh
 sudo apt install ./dist/vitrine_0.1.0_amd64.deb
 ```
 

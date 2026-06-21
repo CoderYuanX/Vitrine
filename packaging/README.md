@@ -1,19 +1,25 @@
 # 打包为 .deb
 
-自包含打包:把应用 + 一个含 `PySide6-Essentials` 的 Python 虚拟环境装进 `/opt/vitrine`,
-装上即用,不依赖系统是否有 PySide6。
+Deepin 源里没有 PySide6(只有 PySide2/Qt5),所以无法直接 `Depends: python3-pyside6`。
+提供两种打包模式:
+
+| 模式 | deb 大小 | 安装 | 说明 |
+| --- | --- | --- | --- |
+| **thin(瘦包,推荐)** | ~26KB | 安装时联网 `pip` 拉依赖到 `/opt/vitrine/venv`(~50–80MB) | deb 极小;安装需联网 |
+| bundled(自包含) | ~52MB | 离线即装即用 | deb 内已带含 PySide6 的 venv;无网环境用这个 |
+
+两者都把应用装进 `/opt/vitrine`,运行依赖都是 `PySide6-Essentials`(不含 WebEngine 等重模块)。
 
 ## 构建
 
 ```bash
-packaging/build-deb.sh            # 默认版本 0.1.0
-packaging/build-deb.sh 0.2.0      # 指定版本
+packaging/build-deb.sh --thin           # 瘦包 → dist/vitrine_0.1.0-thin_amd64.deb
+packaging/build-deb.sh                   # 自包含 → dist/vitrine_0.1.0_amd64.deb
+packaging/build-deb.sh --thin 0.2.0      # 指定版本
 ```
 
-产物:`dist/vitrine_<版本>_<架构>.deb`(`dist/` 已被 git 忽略)。
-
-构建机需要:`python3`(venv 基座)、`pip`、`dpkg-deb`。首次会联网下载
-`PySide6-Essentials`(~150–200MB)。
+产物在 `dist/`(已被 git 忽略)。构建机需要:`python3`、`pip`、`dpkg-deb`;
+bundled 模式构建时会联网下载 `PySide6-Essentials`(~150–200MB)。
 
 ## 安装 / 卸载
 
@@ -38,6 +44,10 @@ sudo apt remove vitrine
 | `/usr/share/icons/hicolor/scalable/apps/vitrine.svg` | 应用图标 |
 
 用户数据(组件开关 / 几何 / 日历事件)写在 `~/.config/deepin-widgets/`,卸载不影响。
+
+> thin 包里 `venv/` 由安装时的 postinst 调用 `setup-venv.sh` 生成;若安装时无网络,
+> 包仍会装上,但运行 `vitrine` 会提示「请联网执行 `sudo /opt/vitrine/setup-venv.sh`」。
+> 卸载(prerm)时会删除该 venv。
 
 ## 说明 / 限制
 
