@@ -64,3 +64,18 @@ def test_toggle_off():
     b = CatalogBridge(rt, WIDGETS)
     b.toggle("clock", False)
     assert rt.calls == [("clock", False)]
+
+
+def test_show_all_enables_implemented_only():
+    rt = FakeRuntime()
+    b = CatalogBridge(rt, WIDGETS)
+    b.showAll()
+    assert ("clock", True) in rt.calls
+    assert all(wid != "weather" for wid, _ in rt.calls)   # 未实现不开
+
+
+def test_hide_all_disables_shown():
+    rt = FakeRuntime(shown=["clock"])
+    b = CatalogBridge(rt, WIDGETS)
+    b.hideAll()
+    assert ("clock", False) in rt.calls
