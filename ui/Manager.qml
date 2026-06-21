@@ -37,8 +37,7 @@ Window {
                 }
                 Row {
                     width: parent.width; height: parent.height - 56
-                    Rectangle { id: sideArea; width: 186; height: parent.height; color: "#fff"
-                        Text { anchors.centerIn: parent; text: "侧栏"; color: "#aaa" } }
+                    Sidebar { id: sideArea; height: parent.height }
                     Rectangle { id: contentArea; width: parent.width - 186; height: parent.height; color: "#fbfcfe"
                         Text { anchors.centerIn: parent; text: "内容区"; color: "#aaa" } }
                 }
