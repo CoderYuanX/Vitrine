@@ -27,7 +27,7 @@ def build_tray(host):
         act.setCheckable(True)
         act.setEnabled(w.get("implemented", True))
         act.setChecked(host.runtime.is_shown(w["id"]))
-        act.toggled.connect((lambda wid: (lambda checked: host.runtime.set_enabled(wid, checked)))(w["id"]))
+        act.toggled.connect((lambda wid: (lambda checked: host.catalog.toggle(wid, checked)))(w["id"]))
         menu.addAction(act)
         host._toggle_actions[w["id"]] = act
     if not host.widgets:
@@ -44,4 +44,14 @@ def build_tray(host):
     tray.setContextMenu(menu)
     tray.show()
     host._tray_menu = menu
+
+    def _resync():
+        for wid, act in host._toggle_actions.items():
+            act.blockSignals(True)
+            act.setChecked(host.runtime.is_shown(wid))
+            act.blockSignals(False)
+
+    host._tray_resync = _resync
+    host.catalog.changed.connect(_resync)
+
     return tray
