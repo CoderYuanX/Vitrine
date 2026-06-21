@@ -17,8 +17,9 @@ _root = _here.parent
 sys.path.insert(0, str(_root / "src"))
 sys.path.insert(0, str(_here))
 
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication  # QApplication (not QGuiApplication) so QtQuick.Controls-backed types also work
 from PySide6 import QtQuick  # MUST import before loading so root is typed QQuickWindow
+from PySide6.QtGui import QSurfaceFormat
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import QTimer, QUrl
 
@@ -31,7 +32,10 @@ out_path  = Path(sys.argv[2]) if len(sys.argv) > 2 else _root / "docs" / "design
 # Make output dir
 out_path.parent.mkdir(parents=True, exist_ok=True)
 
-app = QGuiApplication(sys.argv[:1])
+_fmt = QSurfaceFormat.defaultFormat()
+_fmt.setAlphaBufferSize(8)
+QSurfaceFormat.setDefaultFormat(_fmt)
+app = QApplication(sys.argv[:1])
 eng = QQmlApplicationEngine()
 mock = MockCatalog()
 eng.rootContext().setContextProperty("catalog", mock)
@@ -54,6 +58,6 @@ def grab():
         app.quit()
     res.ready.connect(done)
 
-QTimer.singleShot(700, grab)
+QTimer.singleShot(900, grab)
 QTimer.singleShot(8000, lambda: (print("TIMEOUT"), app.quit()))
 sys.exit(app.exec())
