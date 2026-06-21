@@ -102,6 +102,7 @@ Item {
                     anchors.fill: parent
                     year: root.year; month: root.month; today: root.today
                     selectedDay: root.selectedDay; accent: root.accent
+                    calendarInfoSource: (typeof calendarInfo !== "undefined") ? calendarInfo : null
                     onDaySelected: function(d) { root.daySelected(d) }
                     onTodayClicked: root.todayClicked()
                     onPrevMonth: root.prevMonth()
@@ -122,7 +123,11 @@ Item {
                 UpcomingCard { anchors.fill: parent; accent: root.accent; todayIso: root.todayIso } }
 
             Rising { x: root.c3; y: root.r2; width: 290; height: 192; delay: 280
-                LunarCard { anchors.fill: parent } }
+                LunarCard {
+                    anchors.fill: parent
+                    year: root.year; month: root.month; day: root.selectedDay
+                    calendarInfoSource: (typeof calendarInfo !== "undefined") ? calendarInfo : null
+                } }
         }
     }
 

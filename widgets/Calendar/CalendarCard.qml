@@ -11,6 +11,7 @@ Rectangle {
     property int today: 20         // 今日日数字(仅当月)
     property int selectedDay: 20
     property color accent: "#2f6bff"
+    property var calendarInfoSource: null
     property int rev: 0                 // 事件变更计数,驱动圆点重算
     signal daySelected(int day)
     signal todayClicked()
@@ -106,6 +107,10 @@ Rectangle {
                     n: modelData.n
                     muted: modelData.muted
                     selected: !modelData.muted && modelData.n === card.selectedDay
+                    subText: (!modelData.muted && card.calendarInfoSource)
+                             ? card.calendarInfoSource.cellLabel(card.year, card.month, modelData.n) : ""
+                    dayType: (!modelData.muted && card.calendarInfoSource)
+                             ? card.calendarInfoSource.dayType(card.year, card.month, modelData.n) : ""
                     dot: modelData.muted ? ""
                        : ((typeof events !== "undefined" && events)
                           ? (card.rev, events.dotFor(card.year, card.month, modelData.n))

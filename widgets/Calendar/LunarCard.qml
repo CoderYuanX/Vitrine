@@ -5,6 +5,13 @@ import "DemoData.js" as Demo
 // 农历 & 笔记卡(grid-area:lunar):月相 + 引言(占位)。
 Rectangle {
     id: card
+    property int year: 2026
+    property int month: 5
+    property int day: 21
+    property var calendarInfoSource: null
+    property var info: calendarInfoSource ? calendarInfoSource.info(year, month, day) : ({})
+    function val(key, fallback) { return info && info[key] ? info[key] : fallback }
+
     radius: 18
     color: Qt.rgba(252/255, 253/255, 255/255, 0.92)
     border.width: 1
@@ -37,8 +44,11 @@ Rectangle {
             ColumnLayout {
                 spacing: 0
                 Text { text: "农历"; font.pixelSize: 11; color: "#9aa3b8" }
-                Text { text: Demo.LUNAR.lunarDate; font.pixelSize: 24; font.weight: Font.Bold; color: "#1c2440" }
-                Text { text: Demo.LUNAR.label; font.pixelSize: 11; color: "#6471a8" }
+                Text { text: card.val("lunarDay", Demo.LUNAR.lunarDate); font.pixelSize: 24; font.weight: Font.Bold; color: "#1c2440" }
+                Text {
+                    text: card.val("lunarYear", "丙午年") + " " + card.val("lunarMonth", "五月")
+                    font.pixelSize: 11; color: "#6471a8"
+                }
             }
         }
 
@@ -56,7 +66,7 @@ Rectangle {
                 spacing: 10
                 Text {
                     Layout.fillWidth: true
-                    text: Demo.LUNAR.quote
+                    text: card.val("festival", "") ? ("今天是 " + card.val("festival", "")) : Demo.LUNAR.quote
                     font.pixelSize: 13; lineHeight: 1.35; color: "#2a3350"; wrapMode: Text.WordWrap
                 }
                 Text { text: "✎"; font.pixelSize: 14; color: "#9aa3b8" }

@@ -7,6 +7,8 @@ Item {
     property bool muted: false
     property bool selected: false
     property string dot: ""          // 分类色,空串=无点
+    property string subText: ""
+    property string dayType: ""      // holiday / workday / ""
     property color accent: "#2f6bff"
     signal clicked()
 
@@ -47,6 +49,18 @@ Item {
                 color: cell.selected ? "#ffffff"
                      : cell.muted ? "#bcc3d2" : "#22304e"
             }
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: cell.subText
+            visible: cell.subText.length > 0 && !cell.selected
+            font.pixelSize: 9
+            width: cell.width - 6
+            elide: Text.ElideRight
+            horizontalAlignment: Text.AlignHCenter
+            color: cell.dayType === "holiday" ? "#ef4444"
+                 : cell.dayType === "workday" ? "#d97706" : "#9aa3b8"
         }
 
         // 分类圆点(选中时隐藏)
