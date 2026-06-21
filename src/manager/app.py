@@ -46,14 +46,18 @@ class ManagerApp:
         from .config_store import ConfigStore
         from .layout_bridge import LayoutBridge
         from .event_bridge import EventBridge
+        from .weather_bridge import WeatherBridge
         from .runtime import WidgetRuntime
         self.registry = WidgetRegistry(PROJECT_ROOT / "widgets")
         self.config = ConfigStore()
         self.layout_bridge = LayoutBridge(self.config)
         self.event_bridge = EventBridge()
+        self.weather_bridge = WeatherBridge(config=self.config)
+        self.weather_bridge.start()
         self.widgets = self.registry.discover()
         self.runtime = WidgetRuntime(self.app, self.widgets, self.config,
-                                     self.layout_bridge, self.event_bridge)
+                                     self.layout_bridge, self.event_bridge,
+                                     self.weather_bridge)
         self.manager_engine = None   # Task 7 填充
 
         from .catalog_bridge import CatalogBridge
@@ -71,6 +75,7 @@ class ManagerApp:
         if self.manager_engine is None:
             eng = QQmlApplicationEngine()
             eng.rootContext().setContextProperty("catalog", self.catalog)
+            eng.rootContext().setContextProperty("weather", self.weather_bridge)
             eng.load(QUrl.fromLocalFile(str(PROJECT_ROOT / "ui" / "Manager.qml")))
             if not eng.rootObjects():
                 return

@@ -6,12 +6,14 @@ from PySide6.QtQml import QQmlApplicationEngine
 class WidgetRuntime:
     """管理桌面小组件卡片窗口:按 id 显示/隐藏,每卡片一个独立 QML engine。"""
 
-    def __init__(self, app, widgets, config, layout_bridge, event_bridge=None):
+    def __init__(self, app, widgets, config, layout_bridge, event_bridge=None,
+                 weather_bridge=None):
         self.app = app
         self.widgets = widgets
         self.config = config
         self.bridge = layout_bridge
         self.event_bridge = event_bridge
+        self.weather_bridge = weather_bridge
         self.engines = {}
 
     def bootstrap(self, default_on):
@@ -37,6 +39,8 @@ class WidgetRuntime:
         eng.rootContext().setContextProperty("layout", self.bridge)
         if self.event_bridge is not None:
             eng.rootContext().setContextProperty("events", self.event_bridge)
+        if self.weather_bridge is not None:
+            eng.rootContext().setContextProperty("weather", self.weather_bridge)
         eng.load(QUrl.fromLocalFile(meta["qml"]))
         roots = eng.rootObjects()
         if not roots:

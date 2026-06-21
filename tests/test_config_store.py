@@ -29,3 +29,28 @@ def test_enabled_and_geometry_coexist(tmp_path):
 def test_corrupt_falls_back(tmp_path):
     p = tmp_path / "c.json"; p.write_text("{ bad")
     assert ConfigStore(p).is_enabled("clock") is False
+
+
+def test_weather_defaults(tmp_path):
+    assert ConfigStore(tmp_path / "c.json").get_weather() == {"autoLocate": True, "city": ""}
+
+
+def test_weather_set_and_roundtrip(tmp_path):
+    p = tmp_path / "c.json"
+    ConfigStore(p).set_weather(auto_locate=False, city="上海")
+    assert ConfigStore(p).get_weather() == {"autoLocate": False, "city": "上海"}
+
+
+def test_weather_partial_update_keeps_other_field(tmp_path):
+    p = tmp_path / "c.json"
+    ConfigStore(p).set_weather(city="广州")
+    ConfigStore(p).set_weather(auto_locate=False)
+    assert ConfigStore(p).get_weather() == {"autoLocate": False, "city": "广州"}
+
+
+def test_weather_coexists_with_widgets(tmp_path):
+    p = tmp_path / "c.json"
+    ConfigStore(p).set_enabled("clock", True)
+    ConfigStore(p).set_weather(city="深圳")
+    assert ConfigStore(p).is_enabled("clock") is True
+    assert ConfigStore(p).get_weather()["city"] == "深圳"

@@ -5,6 +5,7 @@ import "DemoData.js" as Demo
 // 天气卡(grid-area:weather):实时时间/日期 + 天气演示数据。
 Rectangle {
     id: card
+    property var weatherSource: null
     property string timeText: "10:28"
     property string ampm: "AM"
     property string dateText: "Tuesday, May 20"
@@ -22,7 +23,7 @@ Rectangle {
         // 城市行
         RowLayout {
             Layout.fillWidth: true
-            Text { text: Demo.WEATHER.cityFull; font.pixelSize: 13; color: "#7b8398" }
+            Text { text: card.weatherSource ? card.weatherSource.cityFull : Demo.WEATHER.cityFull; font.pixelSize: 13; color: "#7b8398" }
             Item { Layout.fillWidth: true }
             Text { text: "⋮"; font.pixelSize: 14; color: "#9aa3b8" }
         }
@@ -44,8 +45,8 @@ Rectangle {
             SunCloud { Layout.preferredWidth: 40; Layout.preferredHeight: 32 }
             ColumnLayout {
                 spacing: 0
-                Text { text: Demo.WEATHER.temp; font.pixelSize: 22; font.weight: Font.Bold; color: "#1c2440" }
-                Text { text: Demo.WEATHER.desc; font.pixelSize: 12; color: "#7b8398" }
+                Text { text: card.weatherSource ? card.weatherSource.temp : Demo.WEATHER.temp; font.pixelSize: 22; font.weight: Font.Bold; color: "#1c2440" }
+                Text { text: card.weatherSource ? card.weatherSource.desc : Demo.WEATHER.desc; font.pixelSize: 12; color: "#7b8398" }
             }
         }
 
@@ -53,9 +54,9 @@ Rectangle {
         RowLayout {
             Layout.topMargin: 6
             spacing: 14
-            Text { text: Demo.WEATHER.hi; font.pixelSize: 12; color: "#7b8398" }
-            Text { text: Demo.WEATHER.lo; font.pixelSize: 12; color: "#7b8398" }
-            Text { text: "湿度 " + Demo.WEATHER.humidity; font.pixelSize: 12; color: "#7b8398" }
+            Text { text: card.weatherSource ? card.weatherSource.hi : Demo.WEATHER.hi; font.pixelSize: 12; color: "#7b8398" }
+            Text { text: card.weatherSource ? card.weatherSource.lo : Demo.WEATHER.lo; font.pixelSize: 12; color: "#7b8398" }
+            Text { text: "湿度 " + (card.weatherSource ? card.weatherSource.humidity : Demo.WEATHER.humidity); font.pixelSize: 12; color: "#7b8398" }
         }
         Item { Layout.fillHeight: true }
     }

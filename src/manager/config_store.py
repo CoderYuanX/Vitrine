@@ -50,3 +50,23 @@ class ConfigStore:
         w = d["widgets"].setdefault(wid, {})
         w["x"], w["y"], w["zoom"] = int(x), int(y), round(float(zoom), 3)
         self._save(d)
+
+    def get_weather(self):
+        w = self._load().get("weather", {})
+        if not isinstance(w, dict):
+            w = {}
+        return {
+            "autoLocate": bool(w.get("autoLocate", True)),
+            "city": str(w.get("city", "")),
+        }
+
+    def set_weather(self, auto_locate=None, city=None):
+        d = self._load()
+        w = d.setdefault("weather", {})
+        if not isinstance(w, dict):
+            w = d["weather"] = {}
+        if auto_locate is not None:
+            w["autoLocate"] = bool(auto_locate)
+        if city is not None:
+            w["city"] = str(city)
+        self._save(d)

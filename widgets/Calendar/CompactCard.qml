@@ -5,6 +5,7 @@ import "DemoData.js" as Demo
 // 折叠态紧凑卡(clock 变体)。拖动=移动窗口;单击=展开。
 Item {
     id: root
+    property var weatherSource: null
     property string timeText: "10:28"
     property string ampm: "AM"
     property string dateText: "Tuesday, May 20"
@@ -53,7 +54,7 @@ Item {
                             c.beginPath(); c.arc(5.5, 5, 1.8, 0, 2 * Math.PI); c.fill()
                         }
                     }
-                    Text { text: Demo.WEATHER.city; font.pixelSize: 13; color: "#7b8398" }
+                    Text { text: root.weatherSource ? root.weatherSource.city : Demo.WEATHER.city; font.pixelSize: 13; color: "#7b8398" }
                 }
                 Item { Layout.fillWidth: true }
                 SunCloud { Layout.preferredWidth: 34; Layout.preferredHeight: 28 }
@@ -70,7 +71,7 @@ Item {
                 Layout.fillWidth: true
                 Text { text: root.dateText; font.pixelSize: 13; color: "#5a6280" }
                 Item { Layout.fillWidth: true }
-                Text { text: Demo.WEATHER.temp; font.pixelSize: 18; font.weight: Font.Bold; color: "#1c2440" }
+                Text { text: root.weatherSource ? root.weatherSource.temp : Demo.WEATHER.temp; font.pixelSize: 18; font.weight: Font.Bold; color: "#1c2440" }
             }
         }
 

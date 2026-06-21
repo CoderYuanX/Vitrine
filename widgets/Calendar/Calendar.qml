@@ -140,6 +140,7 @@ Window {
             visible: !root.expanded
             x: 20; y: 16
             winRef: root
+            weatherSource: (typeof weather !== "undefined") ? weather : null
             timeText: root.timeText
             ampm: root.ampm
             dateText: root.dateLong

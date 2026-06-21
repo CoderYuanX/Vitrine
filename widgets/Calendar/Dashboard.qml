@@ -92,6 +92,7 @@ Item {
 
             Rising { x: root.c0; y: root.r0; width: 252; height: 188; delay: 100
                 WeatherCard { anchors.fill: parent
+                    weatherSource: (typeof weather !== "undefined") ? weather : null
                     timeText: root.timeText
                     ampm: root.ampm
                     dateText: root.fullDateLabel
