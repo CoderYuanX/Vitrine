@@ -1,3 +1,4 @@
+import os
 import sys
 import signal
 from pathlib import Path
@@ -6,6 +7,19 @@ from PySide6.QtGui import QSurfaceFormat, QFont
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ON = {"clock"}
+
+
+def _strip_dxcb(value):
+    """从 QT_QPA_PLATFORM 列表里去掉 dxcb。
+
+    Deepin 注入 'dxcb;xcb',但 PySide6 不带 dxcb 插件,Qt 会先试 dxcb 打印
+    告警再回退。去掉后保留其余回退;全空则用 xcb。非 dxcb 取值原样返回。
+    """
+    parts = [p for p in value.split(";") if p]
+    if "dxcb" not in parts:
+        return value
+    kept = [p for p in parts if p != "dxcb"]
+    return ";".join(kept) if kept else "xcb"
 # 字体优先级回退:QML 的 font.families 在本机 PySide6 不可用,改在应用级用 QFont.setFamilies 设置,
 # QML Text 继承此族(各自仍可覆盖 pixelSize/weight)。Deepin 上解析到 Noto Sans CJK SC。
 UI_FONT_FAMILIES = ["PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC"]
@@ -13,6 +27,10 @@ UI_FONT_FAMILIES = ["PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC"]
 
 class ManagerApp:
     def __init__(self):
+        # 必须在 QApplication 之前清洗:去掉 Deepin 的 dxcb,消除平台插件告警
+        _plat = os.environ.get("QT_QPA_PLATFORM")
+        if _plat:
+            os.environ["QT_QPA_PLATFORM"] = _strip_dxcb(_plat)
         fmt = QSurfaceFormat.defaultFormat()
         fmt.setAlphaBufferSize(8)
         QSurfaceFormat.setDefaultFormat(fmt)
