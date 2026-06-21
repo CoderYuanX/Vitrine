@@ -1,0 +1,1 @@
+{"id": "clock", "name": "数字时钟", "qml": "Clock.qml", "defaultSize": [320, 210]}
