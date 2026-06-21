@@ -45,3 +45,11 @@ def test_category_and_implemented_explicit(tmp_path):
     r = WidgetRegistry(tmp_path).discover()[0]
     assert r["category"] == "weather"
     assert r["implemented"] is False
+
+
+def test_discover_uses_gallery_order(tmp_path):
+    for wid in ["weather", "launcher", "clock", "note", "system", "calendar"]:
+        d = tmp_path / wid; d.mkdir()
+        (d / "widget.json").write_text(json.dumps({"id": wid, "name": wid}))
+    r = WidgetRegistry(tmp_path).discover()
+    assert [w["id"] for w in r] == ["clock", "weather", "calendar", "system", "note", "launcher"]

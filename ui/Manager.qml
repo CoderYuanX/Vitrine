@@ -1,38 +1,49 @@
 import QtQuick
 import QtQuick.Window
-import QtQuick.Effects
 
 Window {
     id: win
-    width: 1000; height: 704            // 含外层 40 边距;主卡 920×624 居中
+    readonly property int baseW: 920
+    readonly property int baseH: 624
+    readonly property real uiScale: Math.min(width / baseW, height / baseH)
+    width: 920; height: 624
+    minimumWidth: 460
+    minimumHeight: 312
     visible: true
     color: "transparent"
     flags: Qt.FramelessWindowHint | Qt.Window
     title: "桌面小组件"
 
-    Rectangle {                          // 外层淡蓝渐变背景
-        anchors.fill: parent
-        gradient: Gradient {
-            orientation: Gradient.Vertical
-            GradientStop { position: 0.0; color: "#cfe0fb" }
-            GradientStop { position: 0.38; color: "#e4eefe" }
-            GradientStop { position: 1.0; color: "#f4f8ff" }
-        }
+    // 锁定纵横比:WM 边缘缩放只改单边时,另一边同步,
+    // 保证 width/baseW === height/baseH —— uiScale 永不 letterbox,
+    // 缩放卡片始终铺满窗口,不留透明可穿透条带。
+    property bool _lockingAspect: false
+    function _lockAspect(byWidth) {
+        if (_lockingAspect)
+            return
+        _lockingAspect = true
+        if (byWidth)
+            height = Math.round(width * baseH / baseW)
+        else
+            width = Math.round(height * baseW / baseH)
+        _lockingAspect = false
+    }
+    onWidthChanged: _lockAspect(true)
+    onHeightChanged: _lockAspect(false)
 
-        // 主卡阴影层(在卡片背后渲染,sibling MultiEffect 模式)
-        MultiEffect {
-            source: card
-            anchors.fill: card
-            shadowEnabled: true
-            shadowColor: Qt.rgba(40/255, 78/255, 160/255, 0.22)
-            shadowBlur: 1.0
-            shadowVerticalOffset: 24
+    Item {
+        id: scaledRoot
+        width: win.baseW
+        height: win.baseH
+        transformOrigin: Item.TopLeft
+        transform: Scale {
+            xScale: win.uiScale
+            yScale: win.uiScale
         }
 
         Rectangle {                      // 主卡(窗口)
             id: card
-            width: 920; height: 624
-            anchors.centerIn: parent
+            anchors.fill: parent
             color: "#ffffff"
             radius: 18
 
@@ -48,9 +59,12 @@ Window {
                 Row {
                     width: parent.width; height: parent.height - 56
                     Sidebar { id: sideArea; height: parent.height }
-                    Rectangle {
+                    Item {
                         id: contentArea
-                        width: parent.width - 186; height: parent.height; color: "#fbfcfe"
+                        width: parent.width - 186; height: parent.height
+                        Rectangle { anchors.fill: parent; color: "#fbfcfe"; radius: 18 }
+                        Rectangle { anchors.left: parent.left; anchors.top: parent.top; width: parent.width; height: 18; color: "#fbfcfe" }
+                        Rectangle { anchors.left: parent.left; anchors.top: parent.top; width: 18; height: parent.height; color: "#fbfcfe" }
                         Loader {
                             anchors.fill: parent; anchors.margins: 20
                             active: catalog.activeCategory === "settings"

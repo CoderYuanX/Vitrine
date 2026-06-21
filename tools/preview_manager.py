@@ -20,21 +20,36 @@ CATS = [{"key":k,"label":l} for k,l in
 
 class MockCatalog(QObject):
     changed = Signal()
-    def __init__(self): super().__init__(); self._a="all"
+    def __init__(self):
+        super().__init__()
+        self._a="all"
+        self._widgets = [dict(w) for w in FAKE]
     @Slot(str)
     def setCategory(self,k): self._a=k; self.changed.emit()
     @Slot(str,bool)
-    def toggle(self,i,o): self.changed.emit()
+    def toggle(self,i,o):
+        for w in self._widgets:
+            if w["id"] == i:
+                w["enabled"] = o
+                break
+        self.changed.emit()
     @Slot()
-    def showAll(self): pass
+    def showAll(self):
+        for w in self._widgets:
+            if w["implemented"]:
+                w["enabled"] = True
+        self.changed.emit()
     @Slot()
-    def hideAll(self): pass
+    def hideAll(self):
+        for w in self._widgets:
+            w["enabled"] = False
+        self.changed.emit()
     @Slot()
     def quitApp(self): pass
     @Slot(bool)
     def setAutostart(self,o): pass
     def _vis(self):
-        return [w for w in FAKE if self._a=="all" or w["category"]==self._a]
+        return [w for w in self._widgets if self._a=="all" or w["category"]==self._a]
     activeCategory = Property(str, lambda s: s._a, notify=changed)
     categories = Property("QVariantList", lambda s: CATS, constant=True)
     visibleWidgets = Property("QVariantList", lambda s: s._vis(), notify=changed)
@@ -47,6 +62,7 @@ if __name__ == "__main__":
     _font = QFont(); _font.setFamilies(["PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC"]); app.setFont(_font)
     from PySide6.QtQml import QQmlApplicationEngine
     eng = QQmlApplicationEngine()
-    eng.rootContext().setContextProperty("catalog", MockCatalog())
+    catalog = MockCatalog()
+    eng.rootContext().setContextProperty("catalog", catalog)
     eng.load(QUrl.fromLocalFile(str(ROOT/"ui"/"Manager.qml")))
     sys.exit(app.exec())

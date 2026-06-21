@@ -9,10 +9,7 @@ Rectangle {
     property bool active: false
     property bool muted: false        // 底部"设置"用
     signal clicked()
-    HoverHandler { id: hh }
-    color: active ? "#e9f1fe"
-         : (hh.hovered ? "#f4f6fa" : "transparent")
-    Behavior on color { ColorAnimation { duration: 120 } }
+    color: active ? "#e9f1fe" : "transparent"
 
     // Icon color: active=blue, muted=dim gray, idle=medium gray
     readonly property string iconColor: item.active ? "#2563eb" : (item.muted ? "#8a93a3" : "#5b6472")

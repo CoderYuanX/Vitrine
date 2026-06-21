@@ -39,18 +39,22 @@ Item {
 
         // 开关图标 20×20(仅 implemented 时可见)
         Item {
-            width: 20; height: 20
-            anchors.right: parent.right; anchors.rightMargin: 17
-            anchors.top: parent.top; anchors.topMargin: 15
+            width: 32; height: 32
+            anchors.right: parent.right; anchors.rightMargin: 11
+            anchors.top: parent.top; anchors.topMargin: 9
             visible: cardRoot.implemented
-            Rectangle { anchors.fill: parent; radius: 10
+            Rectangle { width: 20; height: 20; radius: 10; anchors.centerIn: parent
                 color: cardRoot.widgetEnabled ? "#3b82f6" : "transparent"
                 border.width: cardRoot.widgetEnabled ? 0 : 1.6
                 border.color: "#ced6e2" }
-            Canvas { anchors.fill: parent; visible: cardRoot.widgetEnabled
+            Canvas { width: 20; height: 20; anchors.centerIn: parent; visible: cardRoot.widgetEnabled
                 onPaint: { var c=getContext("2d"); c.strokeStyle="#fff"; c.lineWidth=2.2; c.lineCap="round"; c.lineJoin="round"
                     c.beginPath(); c.moveTo(5.8,10.3); c.lineTo(8.6,13.0); c.lineTo(14.2,7.5); c.stroke() } }
-            TapHandler { onTapped: catalog.toggle(cardRoot.wid, !cardRoot.widgetEnabled) }
+            MouseArea {
+                width: 24; height: 24; anchors.centerIn: parent   // 贴合 20×20 可视开关,留 2px 容差,不侵入卡片留白
+                cursorShape: Qt.PointingHandCursor
+                onClicked: catalog.toggle(cardRoot.wid, !cardRoot.widgetEnabled)
+            }
         }
 
         // 预览/占位槽

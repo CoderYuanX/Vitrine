@@ -4,6 +4,8 @@ Rectangle {
     id: side
     width: 186
     color: "#ffffff"
+    radius: 18
+    Rectangle { anchors.right: parent.right; width: 18; height: parent.height; color: "#ffffff" }
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#f1f3f7" }
 
     Column {
