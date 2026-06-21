@@ -55,7 +55,7 @@ Rectangle {
             spacing: 14
             Text { text: Demo.WEATHER.hi; font.pixelSize: 12; color: "#7b8398" }
             Text { text: Demo.WEATHER.lo; font.pixelSize: 12; color: "#7b8398" }
-            Text { text: "Humidity " + Demo.WEATHER.humidity; font.pixelSize: 12; color: "#7b8398" }
+            Text { text: "湿度 " + Demo.WEATHER.humidity; font.pixelSize: 12; color: "#7b8398" }
         }
         Item { Layout.fillHeight: true }
     }

@@ -30,18 +30,18 @@ Rectangle {
 
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "Productivity"; font.pixelSize: 13; font.weight: Font.Bold; color: "#1c2440" }
+            Text { text: "效率"; font.pixelSize: 13; font.weight: Font.Bold; color: "#1c2440" }
             Item { Layout.fillWidth: true }
             Text { text: "⋮"; font.pixelSize: 14; color: "#9aa3b8" }
         }
 
         RowLayout {
             Layout.fillWidth: true; Layout.topMargin: 14
-            Stat { label: "Meetings";   value: Demo.PRODUCTIVITY.meetings;  sub: "Today" }
+            Stat { label: "会议";     value: Demo.PRODUCTIVITY.meetings;  sub: "今日" }
             Item { Layout.fillWidth: true }
-            Stat { label: "Tasks Done"; value: Demo.PRODUCTIVITY.tasksDone; sub: "This Week" }
+            Stat { label: "完成任务"; value: Demo.PRODUCTIVITY.tasksDone; sub: "本周" }
             Item { Layout.fillWidth: true }
-            Stat { label: "Focus Time"; value: Demo.PRODUCTIVITY.focus;     sub: "This Week" }
+            Stat { label: "专注时长"; value: Demo.PRODUCTIVITY.focus;     sub: "本周" }
         }
 
         Item { Layout.fillHeight: true }

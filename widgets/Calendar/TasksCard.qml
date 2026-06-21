@@ -29,7 +29,6 @@ Rectangle {
         property string text_: ""
         property string rightText: ""
         property color rightColor: "#9aa3b8"
-        property color rightBg: "transparent"
         property bool isTag: false
         signal toggled()
         spacing: 9
@@ -54,13 +53,14 @@ Rectangle {
             color: row.done ? "#aeb4c4" : "#2a3350"
             font.strikeout: row.done
         }
-        Rectangle {
+        Item {
             visible: isTag
             Layout.alignment: Qt.AlignTop
-            radius: 6; color: rightBg
             implicitWidth: tagT.implicitWidth + 14; implicitHeight: tagT.implicitHeight + 4
-            Text { id: tagT; anchors.centerIn: parent; text: rightText
-                   font.pixelSize: 11; font.weight: Font.Bold; color: rightColor }
+            // 背景单独一层(低透明),避免文字被 opacity 继承变淡 / rgba 字符串解析失败变黑
+            Rectangle { anchors.fill: parent; radius: 6; color: row.rightColor; opacity: 0.13 }
+            Text { id: tagT; anchors.centerIn: parent; text: row.rightText
+                   font.pixelSize: 11; font.weight: Font.Bold; color: row.rightColor }
         }
         Text {
             visible: !isTag
@@ -78,7 +78,7 @@ Rectangle {
         // 标题
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "Tasks & Reminders"; font.pixelSize: 15; font.weight: Font.Bold; color: "#1c2440" }
+            Text { text: "任务与提醒"; font.pixelSize: 15; font.weight: Font.Bold; color: "#1c2440" }
             Item { Layout.fillWidth: true }
             Text { text: "+"; font.pixelSize: 20; font.weight: Font.Bold; color: card.accent }
         }
@@ -86,7 +86,7 @@ Rectangle {
         // Due Today
         RowLayout {
             Layout.topMargin: 12; Layout.bottomMargin: 6; spacing: 7
-            Text { text: "Due Today"; font.pixelSize: 13; font.weight: Font.Bold; color: card.accent }
+            Text { text: "今日待办"; font.pixelSize: 13; font.weight: Font.Bold; color: card.accent }
             Text { text: card.dueCount; font.pixelSize: 11; color: "#9aa3b8" }
         }
         Repeater {
@@ -98,7 +98,6 @@ Rectangle {
                 isTag: true
                 rightText: model.tag
                 rightColor: model.tc
-                rightBg: model.tb
                 onToggled: { card.todayModel.setProperty(index, "done", !model.done); card.rev++ }
             }
         }
@@ -106,7 +105,7 @@ Rectangle {
         // This Week
         RowLayout {
             Layout.topMargin: 10; Layout.bottomMargin: 4; spacing: 7
-            Text { text: "This Week"; font.pixelSize: 13; font.weight: Font.Bold; color: "#6471a8" }
+            Text { text: "本周"; font.pixelSize: 13; font.weight: Font.Bold; color: "#6471a8" }
             Text { text: Demo.TASKS_WEEK.length; font.pixelSize: 11; color: "#9aa3b8" }
         }
         Repeater {
@@ -123,7 +122,7 @@ Rectangle {
         Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(120/255,130/255,160/255,0.16) }
         RowLayout {
             Layout.fillWidth: true; Layout.topMargin: 10
-            Text { text: "View All Tasks"; font.pixelSize: 13; font.weight: Font.Bold; color: "#2a3350" }
+            Text { text: "查看全部"; font.pixelSize: 13; font.weight: Font.Bold; color: "#2a3350" }
             Item { Layout.fillWidth: true }
             Text { text: "›"; font.pixelSize: 16; font.weight: Font.Bold; color: card.accent }
         }

@@ -37,7 +37,7 @@ Rectangle {
 
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "Upcoming"; font.pixelSize: 13; font.weight: Font.Bold; color: "#1c2440" }
+            Text { text: "即将到来"; font.pixelSize: 13; font.weight: Font.Bold; color: "#1c2440" }
             Item { Layout.fillWidth: true }
             Text { text: "⋮"; font.pixelSize: 14; color: "#9aa3b8" }
         }
@@ -62,7 +62,7 @@ Rectangle {
         Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(120/255,130/255,160/255,0.16); Layout.topMargin: 6 }
         RowLayout {
             Layout.fillWidth: true; Layout.topMargin: 6
-            Text { text: "View Calendar"; font.pixelSize: 13; font.weight: Font.Bold; color: "#2a3350" }
+            Text { text: "查看日历"; font.pixelSize: 13; font.weight: Font.Bold; color: "#2a3350" }
             Item { Layout.fillWidth: true }
             Text { text: "›"; font.pixelSize: 16; font.weight: Font.Bold; color: card.accent }
         }

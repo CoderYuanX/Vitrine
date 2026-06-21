@@ -32,10 +32,11 @@ Window {
     readonly property string selectedIso: viewYear + "-" + pad2(viewMonth + 1) + "-" + pad2(selectedDay)
     readonly property string todayIso: curYear + "-" + pad2(curMonth + 1) + "-" + pad2(curToday)
 
-    property string ampm: Qt.formatTime(now, "AP")
-    property string timeText: Qt.formatTime(now, "h:mm AP").replace(" " + Qt.formatTime(now, "AP"), "")
-    property string dateLong: Qt.formatDate(now, "dddd, MMM d")
-    property string dateShort: Qt.formatDate(now, "ddd, MMM d")
+    readonly property var _weekday: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+    property string ampm: ""
+    property string timeText: Qt.formatTime(now, "HH:mm")
+    property string dateLong: curYear + "年" + (curMonth + 1) + "月" + curToday + "日 " + _weekday[now.getDay()]
+    property string dateShort: (curMonth + 1) + "月" + curToday + "日 " + _weekday[now.getDay()]
 
     // 折叠/展开基准尺寸
     readonly property int baseW: expanded ? 1150 : 296
@@ -81,7 +82,7 @@ Window {
         applyPosition()
         var T = demoTasks.list
         for (var i = 0; i < T.length; i++)
-            taskStore.append({ text: T[i].text, tag: T[i].tag, tc: T[i].tc, tb: T[i].tb, done: false })
+            taskStore.append({ text: T[i].text, tag: T[i].tag, tc: T[i].tc, done: false })
     }
 
     // 拖动后(系统移动)防抖保存位置;只在折叠态、非程序化定位时记录卡片主位置
@@ -103,9 +104,9 @@ Window {
     QtObject {
         id: demoTasks
         property var list: [
-            { text: "Prepare project proposal", tag: "Work",     tc: "#7c3aed", tb: "rgba(124,58,237,.12)" },
-            { text: "Reply to client emails",   tag: "Work",     tc: "#7c3aed", tb: "rgba(124,58,237,.12)" },
-            { text: "Buy groceries for dinner", tag: "Personal", tc: "#16a34a", tb: "rgba(22,163,74,.12)" }
+            { text: "整理项目方案", tag: "工作", tc: "#7c3aed" },
+            { text: "回复客户邮件", tag: "工作", tc: "#7c3aed" },
+            { text: "买菜准备晚餐", tag: "个人", tc: "#16a34a" }
         ]
     }
 

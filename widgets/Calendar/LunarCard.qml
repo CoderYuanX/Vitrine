@@ -18,7 +18,7 @@ Rectangle {
 
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "Lunar & Notes"; font.pixelSize: 13; font.weight: Font.Bold; color: "#1c2440" }
+            Text { text: "农历 & 笔记"; font.pixelSize: 13; font.weight: Font.Bold; color: "#1c2440" }
             Item { Layout.fillWidth: true }
             Text { text: "⋮"; font.pixelSize: 14; color: "#9aa3b8" }
         }
@@ -36,7 +36,7 @@ Rectangle {
             }
             ColumnLayout {
                 spacing: 0
-                Text { text: "Lunar Date"; font.pixelSize: 11; color: "#9aa3b8" }
+                Text { text: "农历"; font.pixelSize: 11; color: "#9aa3b8" }
                 Text { text: Demo.LUNAR.lunarDate; font.pixelSize: 24; font.weight: Font.Bold; color: "#1c2440" }
                 Text { text: Demo.LUNAR.label; font.pixelSize: 11; color: "#6471a8" }
             }

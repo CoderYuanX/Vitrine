@@ -38,7 +38,7 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             Text {
-                text: Cal.monthName(card.month) + " " + card.year
+                text: card.year + "年" + (card.month + 1) + "月"
                 font.pixelSize: 20; font.weight: Font.Bold; color: "#1c2440"
             }
             Item { Layout.fillWidth: true }
@@ -64,7 +64,7 @@ Rectangle {
                 border.color: todayMA.containsMouse ? "#9bb4ee" : "#d2d8e6"
                 Text {
                     id: todayLbl; anchors.centerIn: parent
-                    text: "Today"; font.pixelSize: 12; font.weight: Font.Bold; color: "#2a3350"
+                    text: "今天"; font.pixelSize: 12; font.weight: Font.Bold; color: "#2a3350"
                 }
                 MouseArea {
                     id: todayMA; anchors.fill: parent; hoverEnabled: true
@@ -79,7 +79,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 10
             Repeater {
-                model: ["SUN","MON","TUE","WED","THU","FRI","SAT"]
+                model: ["日","一","二","三","四","五","六"]
                 delegate: Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
