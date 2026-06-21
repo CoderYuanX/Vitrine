@@ -38,7 +38,23 @@ Item {
             // 城市 + 天气图标
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "📍 " + Demo.WEATHER.city; font.pixelSize: 13; color: "#7b8398" }
+                RowLayout {
+                    spacing: 5
+                    // 矢量定位针(替代 📍 emoji,避免系统 emoji 字体影响)
+                    Canvas {
+                        Layout.preferredWidth: 11; Layout.preferredHeight: 13
+                        Layout.alignment: Qt.AlignVCenter
+                        onPaint: {
+                            var c = getContext("2d"); c.reset()
+                            c.fillStyle = "#7b8398"
+                            c.beginPath(); c.arc(5.5, 5, 4.5, 0, 2 * Math.PI); c.fill()
+                            c.beginPath(); c.moveTo(1.8, 7.0); c.lineTo(9.2, 7.0); c.lineTo(5.5, 13); c.closePath(); c.fill()
+                            c.fillStyle = "#ffffff"
+                            c.beginPath(); c.arc(5.5, 5, 1.8, 0, 2 * Math.PI); c.fill()
+                        }
+                    }
+                    Text { text: Demo.WEATHER.city; font.pixelSize: 13; color: "#7b8398" }
+                }
                 Item { Layout.fillWidth: true }
                 SunCloud { Layout.preferredWidth: 34; Layout.preferredHeight: 28 }
             }

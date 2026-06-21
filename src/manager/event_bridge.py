@@ -36,7 +36,10 @@ class EventBridge(QObject):
         title = (title or "").strip()
         if not title:
             return
-        self._s.add(date_iso, title, cat=cat or "work", time=time or "")
+        try:
+            self._s.add(date_iso, title, cat=cat or "work", time=time or "")
+        except ValueError:
+            return  # 非法日期不写入(UI 已收敛 selectedDay,这里是兜底)
         self.changed.emit()
 
     @Slot(str)

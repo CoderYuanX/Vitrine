@@ -72,6 +72,26 @@ def test_unknown_cat_defaults_to_work(tmp_path):
     assert s.for_day(2026, 5, 21)[0]["cat"] == "work"
 
 
+def test_add_rejects_invalid_date(tmp_path):
+    s = _store(tmp_path)
+    import pytest as _pt
+    with _pt.raises(ValueError):
+        s.add("2026-02-31", "不存在的日期", cat="work")
+    with _pt.raises(ValueError):
+        s.add("garbage", "乱码", cat="work")
+    # 没有任何坏数据写入
+    assert s.for_month(2026, 1) == []
+
+
+def test_add_normalizes_or_drops_bad_time(tmp_path):
+    s = _store(tmp_path)
+    s.add("2026-06-21", "补零", cat="work", time="9:5")     # 规范化为 09:05
+    s.add("2026-06-21", "非法", cat="work", time="25:99")   # 非法 → 清空
+    by_title = {e["title"]: e["time"] for e in s.for_day(2026, 5, 21)}
+    assert by_title["补零"] == "09:05"
+    assert by_title["非法"] == ""
+
+
 def test_malformed_file_is_ignored(tmp_path):
     p = tmp_path / "events.json"
     p.write_text("{ not json")

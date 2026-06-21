@@ -24,8 +24,11 @@ Window {
     // 月历翻页视图(与"今日"分离):默认当月,翻页改这两个值,Today 复位
     property int viewYear: curYear
     property int viewMonth: curMonth
-    function prevMonth() { if (viewMonth === 0) { viewMonth = 11; viewYear-- } else viewMonth-- }
-    function nextMonth() { if (viewMonth === 11) { viewMonth = 0; viewYear++ } else viewMonth++ }
+    function _daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate() }
+    // 翻月后把 selectedDay 收敛到新月份的合法范围(避免 2026-02-31 这类不存在的日期)
+    function _clampSel() { var d = _daysInMonth(viewYear, viewMonth); if (selectedDay > d) selectedDay = d }
+    function prevMonth() { if (viewMonth === 0) { viewMonth = 11; viewYear-- } else viewMonth--; _clampSel() }
+    function nextMonth() { if (viewMonth === 11) { viewMonth = 0; viewYear++ } else viewMonth++; _clampSel() }
     function goToday() { viewYear = curYear; viewMonth = curMonth; selectedDay = curToday }
     function pad2(v) { return (v < 10 ? "0" : "") + v }
     // 选中日 / 今日的 ISO 日期(YYYY-MM-DD),供事件库读写
@@ -33,6 +36,9 @@ Window {
     readonly property string todayIso: curYear + "-" + pad2(curMonth + 1) + "-" + pad2(curToday)
 
     readonly property var _weekday: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+    // 右侧日程标题:基于 view 月 + selectedDay(而非今天)
+    readonly property string selectedDateLabel: (viewMonth + 1) + "月" + selectedDay + "日 "
+        + _weekday[new Date(viewYear, viewMonth, selectedDay).getDay()]
     property string ampm: ""
     property string timeText: Qt.formatTime(now, "HH:mm")
     property string dateLong: curYear + "年" + (curMonth + 1) + "月" + curToday + "日 " + _weekday[now.getDay()]
@@ -156,7 +162,7 @@ Window {
                     todayIso: root.todayIso
                     timeText: root.timeText
                     ampm: root.ampm
-                    dateLabel: root.dateShort
+                    dateLabel: root.selectedDateLabel
                     fullDateLabel: root.dateLong
                     tasksModel: taskStore
                     winRef: root

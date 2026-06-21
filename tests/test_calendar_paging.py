@@ -57,6 +57,33 @@ def test_next_month_wraps_year(root):
     assert root.property("viewYear") == 2027
 
 
+def test_next_month_clamps_selected_day(root):
+    # 1 月(31 天)选中 31 → 翻到 2 月(2026 非闰,28 天)应收敛为 28
+    root.setProperty("viewYear", 2026)
+    root.setProperty("viewMonth", 0)
+    root.setProperty("selectedDay", 31)
+    QMetaObject.invokeMethod(root, "nextMonth")
+    assert root.property("viewMonth") == 1
+    assert root.property("selectedDay") == 28
+
+
+def test_prev_month_clamps_selected_day(root):
+    # 3 月(31 天)选中 31 → 翻到 2 月应收敛为 28
+    root.setProperty("viewYear", 2026)
+    root.setProperty("viewMonth", 2)
+    root.setProperty("selectedDay", 31)
+    QMetaObject.invokeMethod(root, "prevMonth")
+    assert root.property("viewMonth") == 1
+    assert root.property("selectedDay") == 28
+
+
+def test_selected_date_label_follows_selected_day_not_today(root):
+    root.setProperty("viewYear", 2026)
+    root.setProperty("viewMonth", 5)   # 6 月
+    root.setProperty("selectedDay", 17)
+    assert root.property("selectedDateLabel").startswith("6月17日")
+
+
 def test_go_today_resets_view_to_current_month(root):
     root.setProperty("viewYear", 2000)
     root.setProperty("viewMonth", 3)

@@ -4,6 +4,31 @@ from datetime import date
 from pathlib import Path
 
 
+def _valid_date(s):
+    try:
+        date.fromisoformat(str(s))
+        return True
+    except ValueError:
+        return False
+
+
+def _norm_time(t):
+    """规范化为 24h 'HH:MM';非法或空 → ''。"""
+    t = str(t or "").strip()
+    if not t:
+        return ""
+    parts = t.split(":")
+    if len(parts) != 2:
+        return ""
+    try:
+        h, m = int(parts[0]), int(parts[1])
+    except ValueError:
+        return ""
+    if 0 <= h <= 23 and 0 <= m <= 59:
+        return f"{h:02d}:{m:02d}"
+    return ""
+
+
 # 分类色(与 widgets/Calendar/DemoData.js 的 CAT 保持一致)
 CAT_COLORS = {
     "work": "#2f6bff",
@@ -67,14 +92,17 @@ class EventStore:
 
     # ---- 写 ----
     def add(self, date_iso, title, cat=_DEFAULT_CAT, time=""):
+        date_iso = str(date_iso)
+        if not _valid_date(date_iso):
+            raise ValueError(f"invalid date: {date_iso!r}")
         d = self._load()
         eid = uuid.uuid4().hex[:8]
         d["events"].append({
             "id": eid,
-            "date": str(date_iso),
+            "date": date_iso,
             "title": str(title),
             "cat": _norm_cat(cat),
-            "time": str(time or ""),
+            "time": _norm_time(time),
         })
         self._save(d)
         return eid
