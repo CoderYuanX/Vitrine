@@ -21,6 +21,17 @@ Window {
     property int curToday: now.getDate()
     property int selectedDay: now.getDate()
 
+    // 月历翻页视图(与"今日"分离):默认当月,翻页改这两个值,Today 复位
+    property int viewYear: curYear
+    property int viewMonth: curMonth
+    function prevMonth() { if (viewMonth === 0) { viewMonth = 11; viewYear-- } else viewMonth-- }
+    function nextMonth() { if (viewMonth === 11) { viewMonth = 0; viewYear++ } else viewMonth++ }
+    function goToday() { viewYear = curYear; viewMonth = curMonth; selectedDay = curToday }
+    function pad2(v) { return (v < 10 ? "0" : "") + v }
+    // 选中日 / 今日的 ISO 日期(YYYY-MM-DD),供事件库读写
+    readonly property string selectedIso: viewYear + "-" + pad2(viewMonth + 1) + "-" + pad2(selectedDay)
+    readonly property string todayIso: curYear + "-" + pad2(curMonth + 1) + "-" + pad2(curToday)
+
     property string ampm: Qt.formatTime(now, "AP")
     property string timeText: Qt.formatTime(now, "h:mm AP").replace(" " + Qt.formatTime(now, "AP"), "")
     property string dateLong: Qt.formatDate(now, "dddd, MMM d")
@@ -58,7 +69,10 @@ Window {
         _restoring = false
     }
     // 立即定位一次,并在尺寸变化落定后(KWin resize)再居中一次兜底
-    onExpandedChanged: { applyPosition(); Qt.callLater(applyPosition) }
+    onExpandedChanged: {
+        if (expanded) { viewYear = curYear; viewMonth = curMonth; selectedDay = curToday }
+        applyPosition(); Qt.callLater(applyPosition)
+    }
 
     Component.onCompleted: {
         var p = layout.getState(widgetId).split(",")
@@ -133,16 +147,23 @@ Window {
             x: 6; y: 6
             sourceComponent: Component {
                 Dashboard {
-                    year: root.curYear
-                    month: root.curMonth
-                    today: root.curToday
+                    year: root.viewYear
+                    month: root.viewMonth
+                    today: (root.viewYear === root.curYear && root.viewMonth === root.curMonth) ? root.curToday : -1
                     selectedDay: root.selectedDay
+                    selectedIso: root.selectedIso
+                    todayIso: root.todayIso
+                    timeText: root.timeText
+                    ampm: root.ampm
                     dateLabel: root.dateShort
+                    fullDateLabel: root.dateLong
                     tasksModel: taskStore
                     winRef: root
                     accent: "#2f6bff"
                     onDaySelected: function (d) { root.selectedDay = d }
-                    onTodayClicked: root.selectedDay = root.curToday
+                    onTodayClicked: root.goToday()
+                    onPrevMonth: root.prevMonth()
+                    onNextMonth: root.nextMonth()
                     onCloseClicked: root.expanded = false
                 }
             }

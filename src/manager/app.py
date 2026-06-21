@@ -27,12 +27,15 @@ class ManagerApp:
         from .registry import WidgetRegistry
         from .config_store import ConfigStore
         from .layout_bridge import LayoutBridge
+        from .event_bridge import EventBridge
         from .runtime import WidgetRuntime
         self.registry = WidgetRegistry(PROJECT_ROOT / "widgets")
         self.config = ConfigStore()
         self.layout_bridge = LayoutBridge(self.config)
+        self.event_bridge = EventBridge()
         self.widgets = self.registry.discover()
-        self.runtime = WidgetRuntime(self.app, self.widgets, self.config, self.layout_bridge)
+        self.runtime = WidgetRuntime(self.app, self.widgets, self.config,
+                                     self.layout_bridge, self.event_bridge)
         self.manager_engine = None   # Task 7 填充
 
         from .catalog_bridge import CatalogBridge
