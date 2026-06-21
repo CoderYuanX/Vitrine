@@ -25,8 +25,9 @@ def build_tray(host):
     for w in host.widgets:
         act = QAction(w["name"], menu)
         act.setCheckable(True)
-        act.setChecked(host.is_shown(w["id"]))
-        act.toggled.connect((lambda wid: (lambda checked: host.set_widget_enabled(wid, checked)))(w["id"]))
+        act.setEnabled(w.get("implemented", True))
+        act.setChecked(host.runtime.is_shown(w["id"]))
+        act.toggled.connect((lambda wid: (lambda checked: host.runtime.set_enabled(wid, checked)))(w["id"]))
         menu.addAction(act)
         host._toggle_actions[w["id"]] = act
     if not host.widgets:
@@ -34,8 +35,8 @@ def build_tray(host):
         empty.setEnabled(False)
         menu.addAction(empty)
     menu.addSeparator()
-    panel = QAction("管理面板…（待设计）", menu)
-    panel.setEnabled(False)
+    panel = QAction("打开管理面板", menu)
+    panel.triggered.connect(host.open_manager)
     menu.addAction(panel)
     quit_act = QAction("退出", menu)
     quit_act.triggered.connect(host.app.quit)
