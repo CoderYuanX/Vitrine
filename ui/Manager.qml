@@ -28,8 +28,13 @@ Window {
 
             Column {
                 anchors.fill: parent
-                Rectangle { id: titleArea; width: parent.width; height: 56; color: "transparent"
-                    Text { anchors.centerIn: parent; text: "标题栏占位"; color: "#aaa" } }
+                TitleBar {
+                    id: titleBar
+                    width: parent.width
+                    onMinimizeClicked: win.hide()
+                    onCloseClicked: win.hide()
+                    DragHandler { target: null; onActiveChanged: if (active) win.startSystemMove() }
+                }
                 Row {
                     width: parent.width; height: parent.height - 56
                     Rectangle { id: sideArea; width: 186; height: parent.height; color: "#fff"
@@ -37,11 +42,6 @@ Window {
                     Rectangle { id: contentArea; width: parent.width - 186; height: parent.height; color: "#fbfcfe"
                         Text { anchors.centerIn: parent; text: "内容区"; color: "#aaa" } }
                 }
-            }
-
-            DragHandler {                // 整卡可拖(标题栏区 Task 8 收窄)
-                target: null
-                onActiveChanged: if (active) win.startSystemMove()
             }
         }
     }
