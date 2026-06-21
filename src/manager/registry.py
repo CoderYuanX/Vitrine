@@ -31,6 +31,8 @@ class WidgetRegistry:
                 "qml": str(sub / qml),
                 "dir": str(sub),
                 "default_size": data.get("defaultSize", [320, 210]),
+                "category": data.get("category", wid),
+                "implemented": bool(data.get("implemented", True)),
             })
         found.sort(key=lambda w: w["id"])
         return found
