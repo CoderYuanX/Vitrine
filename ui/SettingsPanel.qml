@@ -45,11 +45,20 @@ Item {
                     width: 180
                     enabled: !weather.autoLocate
                     opacity: enabled ? 1.0 : 0.5
-                    text: weather.manualCity
-                    placeholderText: "如:上海 / Shanghai"
+                    placeholderText: "如:上海 / shanghai / chongqing"
                     font.pixelSize: 13
                     color: "#222c43"
                     background: Rectangle { radius: 8; color: "#f4f6fb"; border.width: 1; border.color: "#e3e8f2" }
+                    // 初值只取一次;不要用 text: weather.manualCity 实时绑定,否则
+                    // settingsChanged(开关也会发)会重算绑定,把正在输入的内容清空。
+                    Component.onCompleted: text = weather.manualCity
+                    Connections {
+                        target: weather
+                        function onSettingsChanged() {
+                            if (!cityField.activeFocus)
+                                cityField.text = weather.manualCity
+                        }
+                    }
                     onEditingFinished: weather.setCity(text)
                 }
             }
