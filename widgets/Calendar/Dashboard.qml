@@ -40,33 +40,29 @@ Item {
     implicitWidth: contentW + 2 * pad
     implicitHeight: contentH + 2 * pad
 
-    // popIn 整容器入场
-    opacity: 0
-    scale: 0.9
-    transform: Translate { id: pop; y: 18 }
-    Component.onCompleted: popAnim.start()
-    ParallelAnimation {
-        id: popAnim
-        NumberAnimation { target: root; property: "opacity"; to: 1; duration: 460; easing.type: Easing.OutCubic }
-        NumberAnimation { target: root; property: "scale";   to: 1; duration: 460; easing.type: Easing.OutCubic }
-        NumberAnimation { target: pop;  property: "y";       to: 0; duration: 460; easing.type: Easing.OutCubic }
-    }
-
-    // 入场:popIn(整容器) + cardRise(各卡错峰)
+    // Window 本身会在折叠/展开时立即换尺寸;这里保持内容同步显示,
+    // 避免透明桌面窗口在 KWin 下出现大块半透明残影。
     component Rising: Item {
         id: ri
+        default property alias content: fade.data
         property int delay: 0
-        opacity: 0
-        scale: 0.97
-        transform: Translate { id: tr; y: 20 }
-        Component.onCompleted: anim.restart()
-        SequentialAnimation {
-            id: anim
-            PauseAnimation { duration: ri.delay }
-            ParallelAnimation {
-                NumberAnimation { target: ri; property: "opacity"; to: 1; duration: 520; easing.type: Easing.OutCubic }
-                NumberAnimation { target: tr; property: "y"; to: 0; duration: 520; easing.type: Easing.OutCubic }
-                NumberAnimation { target: ri; property: "scale"; to: 1; duration: 520; easing.type: Easing.OutCubic }
+        opacity: 1
+
+        Item {
+            id: fade
+            anchors.fill: parent
+            opacity: 0
+            visible: opacity > 0
+            transform: Translate { id: rise; y: 10 }
+
+            Component.onCompleted: anim.restart()
+            SequentialAnimation {
+                id: anim
+                PauseAnimation { duration: ri.delay }
+                ParallelAnimation {
+                    NumberAnimation { target: fade; property: "opacity"; to: 1; duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: rise; property: "y"; to: 0; duration: 180; easing.type: Easing.OutCubic }
+                }
             }
         }
     }
