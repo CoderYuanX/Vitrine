@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="6b3388f0-f5e4-4a49-8a6e-75d8b3c77c47"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  body { margin: 0; }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-thumb { background: #d8e0ec; border-radius: 8px; }
+  *::-webkit-scrollbar-thumb:hover { background: #c2cddd; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  @keyframes wm-spin { to { transform: rotate(360deg); } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px; box-sizing: border-box; background: linear-gradient(155deg, #cfe0fb 0%, #e4eefe 38%, #f4f8ff 100%); font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;">
+
+  <div style="width: 920px; height: 624px; background: #ffffff; border-radius: 18px; box-shadow: 0 24px 70px rgba(40, 78, 160, 0.22), 0 2px 8px rgba(40, 78, 160, 0.08); display: flex; flex-direction: column; overflow: hidden;">
+
+    <!-- Title bar -->
+    <div style="height: 56px; flex: none; display: flex; align-items: center; padding: 0 18px 0 20px; border-bottom: 1px solid #f1f3f7;">
+      <div style="width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(150deg, #5b9bff, #3b76f6); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(59, 118, 246, 0.35);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.8" fill="#fff"></rect><rect x="14" y="3" width="7" height="7" rx="1.8" fill="#fff" opacity="0.8"></rect><rect x="3" y="14" width="7" height="7" rx="1.8" fill="#fff" opacity="0.8"></rect><rect x="14" y="14" width="7" height="7" rx="1.8" fill="#fff"></rect></svg>
+      </div>
+      <span style="margin-left: 11px; font-size: 15px; font-weight: 600; color: #2b3344; letter-spacing: 0.2px;">桌面小组件</span>
+      <div style="flex: 1;"></div>
+      <div style="width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #9aa4b4;" style-hover="background: #f2f4f8;">
+        <svg width="15" height="15" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line></svg>
+      </div>
+      <div style="width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: 2px; color: #9aa4b4;" style-hover="background: #ffeceb; color: #ef4444;">
+        <svg width="14" height="14" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line></svg>
+      </div>
+    </div>
+
+    <div style="flex: 1; display: flex; min-height: 0;">
+
+      <!-- Sidebar -->
+      <div style="width: 186px; flex: none; padding: 14px 12px; display: flex; flex-direction: column; border-right: 1px solid #f1f3f7;">
+
+        <div onclick="{{ go.all }}" style="display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 500; margin-bottom: 3px; background: {{ nav.all.bg }}; color: {{ nav.all.fg }};">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="2"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="2"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="2"></rect><rect x="13.5" y="13.5" width="7" height="7" rx="2"></rect></svg>
+          全部
+        </div>
+        <div onclick="{{ go.clock }}" style="display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 500; margin-bottom: 3px; background: {{ nav.clock.bg }}; color: {{ nav.clock.fg }};">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          时钟
+        </div>
+        <div onclick="{{ go.weather }}" style="display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 500; margin-bottom: 3px; background: {{ nav.weather.bg }}; color: {{ nav.weather.fg }};">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7.5 18h9a4 4 0 0 0 .4-7.98A5.5 5.5 0 0 0 6.4 11 3.5 3.5 0 0 0 7.5 18Z" stroke-linejoin="round"></path></svg>
+          天气
+        </div>
+        <div onclick="{{ go.calendar }}" style="display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 500; margin-bottom: 3px; background: {{ nav.calendar.bg }}; color: {{ nav.calendar.fg }};">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4" stroke-linecap="round"></path></svg>
+          日历
+        </div>
+        <div onclick="{{ go.system }}" style="display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 500; margin-bottom: 3px; background: {{ nav.system.bg }}; color: {{ nav.system.fg }};">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="12" rx="2"></rect><path d="M9 20.5h6M12 16.5v4" stroke-linecap="round"></path></svg>
+          系统
+        </div>
+        <div onclick="{{ go.note }}" style="display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 500; margin-bottom: 3px; background: {{ nav.note.bg }}; color: {{ nav.note.fg }};">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3.5h10l4 4v13a0 0 0 0 1 0 0H5a0 0 0 0 1 0 0Z" stroke-linejoin="round"></path><path d="M14.5 3.5V8h4.2M8 13h8M8 16.5h5" stroke-linecap="round"></path></svg>
+          便签
+        </div>
+
+        <div style="flex: 1;"></div>
+
+        <div style="display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 500; color: #8a93a3;" style-hover="background: #f4f6fa;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v2.5M12 19v2.5M4.2 7l2.2 1.3M17.6 15.7l2.2 1.3M4.2 17l2.2-1.3M17.6 8.3l2.2-1.3" stroke-linecap="round"></path></svg>
+          设置
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div style="flex: 1; padding: 18px 20px; overflow-y: auto; background: #fbfcfe; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-content: start;">
+
+        <!-- Clock -->
+        <sc-if value="{{ show.clock }}" hint-placeholder-val="{{ true }}">
+        <div style="background: #fff; border: 1px solid #eef1f6; border-radius: 14px; padding: 15px 17px; box-shadow: 0 1px 3px rgba(20,40,90,0.04);" style-hover="box-shadow: 0 6px 18px rgba(40,78,160,0.10);">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 600; color: #8a93a3;">时钟</span>
+            <div onclick="{{ tgl.clock }}" style="cursor: pointer; display: flex;">
+              <sc-if value="{{ on.clock }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#3b82f6"></circle><path d="M7 12.4l3.3 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ off.clock }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.4" fill="none" stroke="#ced6e2" stroke-width="1.6"></circle></svg></sc-if>
+            </div>
+          </div>
+          <div style="margin-top: 14px; font-size: 46px; font-weight: 700; color: #222c43; letter-spacing: 1px; line-height: 1; font-variant-numeric: tabular-nums;">{{ time }}</div>
+          <div style="margin-top: 12px; font-size: 13px; color: #9aa4b4;">{{ dateLine }}</div>
+        </div>
+        </sc-if>
+
+        <!-- Weather -->
+        <sc-if value="{{ show.weather }}" hint-placeholder-val="{{ true }}">
+        <div style="background: linear-gradient(160deg, #ffffff 60%, #f3f8ff); border: 1px solid #eef1f6; border-radius: 14px; padding: 15px 17px; box-shadow: 0 1px 3px rgba(20,40,90,0.04);" style-hover="box-shadow: 0 6px 18px rgba(40,78,160,0.10);">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 600; color: #8a93a3;">天气</span>
+            <div onclick="{{ tgl.weather }}" style="cursor: pointer; display: flex;">
+              <sc-if value="{{ on.weather }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#3b82f6"></circle><path d="M7 12.4l3.3 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ off.weather }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.4" fill="none" stroke="#ced6e2" stroke-width="1.6"></circle></svg></sc-if>
+            </div>
+          </div>
+          <div style="margin-top: 8px; display: flex; align-items: flex-start; justify-content: space-between;">
+            <div>
+              <div style="font-size: 40px; font-weight: 700; color: #222c43; line-height: 1;">26°</div>
+              <div style="margin-top: 10px; font-size: 12.5px; color: #8a93a3;">北京 · 晴</div>
+            </div>
+            <svg width="58" height="58" viewBox="0 0 24 24">
+              <g style="transform-origin: 12px 12px; animation: wm-spin 22s linear infinite;">
+                <line x1="12" y1="1.5" x2="12" y2="4" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line><line x1="12" y1="20" x2="12" y2="22.5" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line><line x1="1.5" y1="12" x2="4" y2="12" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line><line x1="20" y1="12" x2="22.5" y2="12" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line><line x1="4.6" y1="4.6" x2="6.4" y2="6.4" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line><line x1="17.6" y1="17.6" x2="19.4" y2="19.4" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line><line x1="4.6" y1="19.4" x2="6.4" y2="17.6" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line><line x1="17.6" y1="6.4" x2="19.4" y2="4.6" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round"></line>
+              </g>
+              <circle cx="12" cy="12" r="5" fill="#fcd34d"></circle>
+            </svg>
+          </div>
+          <div style="margin-top: 6px; display: flex; justify-content: space-between; font-size: 12px; color: #aab2c0;">
+            <span>18° / 28°</span><span>湿度 40%</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- Calendar -->
+        <sc-if value="{{ show.calendar }}" hint-placeholder-val="{{ true }}">
+        <div style="background: #fff; border: 1px solid #eef1f6; border-radius: 14px; padding: 15px 17px; box-shadow: 0 1px 3px rgba(20,40,90,0.04);" style-hover="box-shadow: 0 6px 18px rgba(40,78,160,0.10);">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 600; color: #8a93a3;">日历</span>
+            <div onclick="{{ tgl.calendar }}" style="cursor: pointer; display: flex;">
+              <sc-if value="{{ on.calendar }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#3b82f6"></circle><path d="M7 12.4l3.3 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ off.calendar }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.4" fill="none" stroke="#ced6e2" stroke-width="1.6"></circle></svg></sc-if>
+            </div>
+          </div>
+          <div style="margin-top: 10px; display: flex; gap: 14px;">
+            <div style="flex: none; width: 78px;">
+              <div style="font-size: 12px; color: #aab2c0;">{{ monthLabel }}</div>
+              <div style="font-size: 38px; font-weight: 700; color: #3b82f6; line-height: 1.05;">{{ bigDay }}</div>
+              <div style="font-size: 12px; color: #9aa4b4;">{{ bigWeek }}</div>
+            </div>
+            <div style="flex: 1;">
+              <div style="display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; font-size: 10px; color: #b8c0cd; text-align: center; margin-bottom: 3px;">
+                <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(7,1fr); gap: 1px;">
+                <sc-for list="{{ calCells }}" as="c" hint-placeholder-count="35">
+                  <div style="height: 17px; display: flex; align-items: center; justify-content: center; font-size: 10.5px; border-radius: 50%; background: {{ c.bg }}; color: {{ c.color }}; font-weight: {{ c.weight }};">{{ c.n }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- System -->
+        <sc-if value="{{ show.system }}" hint-placeholder-val="{{ true }}">
+        <div style="background: #fff; border: 1px solid #eef1f6; border-radius: 14px; padding: 15px 17px; box-shadow: 0 1px 3px rgba(20,40,90,0.04);" style-hover="box-shadow: 0 6px 18px rgba(40,78,160,0.10);">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 600; color: #8a93a3;">系统状态</span>
+            <div onclick="{{ tgl.system }}" style="cursor: pointer; display: flex;">
+              <sc-if value="{{ on.system }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#3b82f6"></circle><path d="M7 12.4l3.3 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ off.system }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.4" fill="none" stroke="#ced6e2" stroke-width="1.6"></circle></svg></sc-if>
+            </div>
+          </div>
+          <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;"><span style="color: #8a93a3;">CPU</span><span style="color: #5b6472; font-weight: 600;">{{ cpu }}%</span></div>
+              <div style="height: 5px; border-radius: 3px; background: #eef1f6; overflow: hidden;"><div style="height: 100%; border-radius: 3px; background: linear-gradient(90deg,#60a5fa,#3b82f6); width: {{ cpuW }}; transition: width 0.6s ease;"></div></div>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;"><span style="color: #8a93a3;">内存</span><span style="color: #5b6472; font-weight: 600;">{{ mem }}%</span></div>
+              <div style="height: 5px; border-radius: 3px; background: #eef1f6; overflow: hidden;"><div style="height: 100%; border-radius: 3px; background: linear-gradient(90deg,#60a5fa,#3b82f6); width: {{ memW }}; transition: width 0.6s ease;"></div></div>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;"><span style="color: #8a93a3;">存储</span><span style="color: #5b6472; font-weight: 600;">{{ disk }}%</span></div>
+              <div style="height: 5px; border-radius: 3px; background: #eef1f6; overflow: hidden;"><div style="height: 100%; border-radius: 3px; background: linear-gradient(90deg,#60a5fa,#3b82f6); width: {{ diskW }};"></div></div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- Note -->
+        <sc-if value="{{ show.note }}" hint-placeholder-val="{{ true }}">
+        <div style="background: #fff; border: 1px solid #eef1f6; border-radius: 14px; padding: 15px 17px; box-shadow: 0 1px 3px rgba(20,40,90,0.04);" style-hover="box-shadow: 0 6px 18px rgba(40,78,160,0.10);">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 600; color: #8a93a3;">便签</span>
+            <div onclick="{{ tgl.note }}" style="cursor: pointer; display: flex;">
+              <sc-if value="{{ on.note }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#3b82f6"></circle><path d="M7 12.4l3.3 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ off.note }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.4" fill="none" stroke="#ced6e2" stroke-width="1.6"></circle></svg></sc-if>
+            </div>
+          </div>
+          <div style="margin-top: 12px; background: #fdf6d8; border: 1px solid #f3e9bf; border-radius: 10px; padding: 14px 15px; min-height: 78px;">
+            <div style="font-size: 15px; line-height: 1.7; color: #7a6f44; font-weight: 500;">生活明朗，<br>万物可爱。</div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- Quick launch -->
+        <sc-if value="{{ show.launcher }}" hint-placeholder-val="{{ true }}">
+        <div style="background: #fff; border: 1px solid #eef1f6; border-radius: 14px; padding: 15px 17px; box-shadow: 0 1px 3px rgba(20,40,90,0.04);" style-hover="box-shadow: 0 6px 18px rgba(40,78,160,0.10);">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 600; color: #8a93a3;">快捷启动</span>
+            <div onclick="{{ tgl.launcher }}" style="cursor: pointer; display: flex;">
+              <sc-if value="{{ on.launcher }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#3b82f6"></circle><path d="M7 12.4l3.3 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ off.launcher }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.4" fill="none" stroke="#ced6e2" stroke-width="1.6"></circle></svg></sc-if>
+            </div>
+          </div>
+          <div style="margin-top: 16px; display: flex; gap: 16px;">
+            <div style="width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(150deg,#ffe08a,#fbbf3c); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 3px 8px rgba(245,180,40,0.3);" style-hover="transform: translateY(-2px);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l1.8 2H20a1 1 0 0 1 1 1v9.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5Z"></path></svg>
+            </div>
+            <div style="width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(150deg,#3ec6e0,#2f80d8); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 3px 8px rgba(47,128,216,0.3);" style-hover="transform: translateY(-2px);">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#fff" stroke-width="1.8"></circle><ellipse cx="12" cy="12" rx="3.6" ry="8.5" stroke="#fff" stroke-width="1.8"></ellipse><line x1="3.7" y1="12" x2="20.3" y2="12" stroke="#fff" stroke-width="1.8"></line></svg>
+            </div>
+            <div style="width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(150deg,#eef1f6,#dce2ec); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 3px 8px rgba(120,130,150,0.18);" style-hover="transform: translateY(-2px);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7b8698" stroke-width="1.9"><circle cx="12" cy="12" r="3"></circle><path d="M12 3.5v2.5M12 18v2.5M4.4 7.2l2.2 1.3M17.4 15.5l2.2 1.3M4.4 16.8l2.2-1.3M17.4 8.5l2.2-1.3" stroke-linecap="round"></path></svg>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{
