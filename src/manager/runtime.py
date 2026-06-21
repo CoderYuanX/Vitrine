@@ -1,5 +1,4 @@
 import sys
-from pathlib import Path
 from PySide6.QtCore import QUrl, QTimer
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -38,6 +37,7 @@ class WidgetRuntime:
         eng.load(QUrl.fromLocalFile(meta["qml"]))
         roots = eng.rootObjects()
         if not roots:
+            eng.deleteLater()
             return
         if self.app.platformName() == "xcb":
             self._apply_desktop_states(roots[0])
