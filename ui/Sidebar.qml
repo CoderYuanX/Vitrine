@@ -18,13 +18,14 @@ Rectangle {
             NavItem {
                 width: parent.width
                 label: modelData.label
+                iconKey: modelData.key
                 active: catalog.activeCategory === modelData.key
                 onClicked: catalog.setCategory(modelData.key)
             }
         }
     }
     NavItem {                            // 底部"设置"
-        label: "设置"; muted: true
+        label: "设置"; muted: true; iconKey: "settings"
         width: parent.width - 24
         anchors.left: parent.left; anchors.leftMargin: 12
         anchors.bottom: parent.bottom; anchors.bottomMargin: 14

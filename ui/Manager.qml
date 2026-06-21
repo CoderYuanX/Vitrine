@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import QtQuick.Effects
 
 Window {
     id: win
@@ -8,6 +9,9 @@ Window {
     color: "transparent"
     flags: Qt.FramelessWindowHint | Qt.Window
     title: "桌面小组件"
+
+    // Global font family for CJK text
+    readonly property string uiFont: "PingFang SC, Microsoft YaHei, Noto Sans CJK SC"
 
     Rectangle {                          // 外层淡蓝渐变背景
         anchors.fill: parent
@@ -18,13 +22,22 @@ Window {
             GradientStop { position: 1.0; color: "#f4f8ff" }
         }
 
+        // 主卡阴影层(在卡片背后渲染,sibling MultiEffect 模式)
+        MultiEffect {
+            source: card
+            anchors.fill: card
+            shadowEnabled: true
+            shadowColor: Qt.rgba(40/255, 78/255, 160/255, 0.22)
+            shadowBlur: 1.0
+            shadowVerticalOffset: 24
+        }
+
         Rectangle {                      // 主卡(窗口)
             id: card
             width: 920; height: 624
             anchors.centerIn: parent
             color: "#ffffff"
             radius: 18
-            // 阴影 Task 13 用 MultiEffect 补;先保证布局
 
             Column {
                 anchors.fill: parent

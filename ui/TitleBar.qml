@@ -28,6 +28,7 @@ Rectangle {
         }
         Text { text: "桌面小组件"; color: "#2b3344"; font.pixelSize: 15
             font.weight: Font.DemiBold; font.letterSpacing: 0.2
+            font.family: "PingFang SC, Microsoft YaHei, Noto Sans CJK SC"
             anchors.verticalCenter: parent.verticalCenter }
     }
 
@@ -36,7 +37,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
         component WinBtn: Rectangle {
-            width: 30; height: 30; radius: 8; color: "transparent"
+            width: 30; height: 30; radius: 8
             property color hoverBg: "#f2f4f8"
             property color iconColor: "#9aa4b4"
             property alias ha: ha
