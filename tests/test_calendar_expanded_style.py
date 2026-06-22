@@ -51,9 +51,9 @@ def test_dashboard_does_not_fade_or_stagger_during_window_resize():
     assert 'target: root; property: "scale"' not in qml
 
 
-def test_dashboard_animation_keeps_panel_visible():
+def test_dashboard_has_no_staggered_opacity_animation_during_morph():
     qml = _read("Dashboard.qml")
 
-    assert "visible: opacity > 0" in qml
-    assert "NumberAnimation { target: fade" in qml
-    assert "PauseAnimation" in qml
+    assert "visible: opacity > 0" not in qml
+    assert "NumberAnimation { target: fade" not in qml
+    assert "PauseAnimation" not in qml

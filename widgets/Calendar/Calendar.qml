@@ -3,6 +3,7 @@ import QtQuick.Window
 
 // 日历仪表盘组件根窗口。折叠=紧凑卡;展开=完整仪表盘。
 // 几何/缩放经 layout 桥持久化(与 Clock 一致)。
+// 展开/折叠为"瞬时"切换(无逐帧动画)——KWin/X11 下对透明无边框窗口做逐帧动画会闪,故不做过渡。
 Window {
     id: root
     property string widgetId: "calendar"
@@ -45,8 +46,12 @@ Window {
     property string dateShort: (curMonth + 1) + "月" + curToday + "日 " + _weekday[now.getDay()]
 
     // 折叠/展开基准尺寸
-    readonly property int baseW: expanded ? 1150 : 296
-    readonly property int baseH: expanded ? 652 : 172
+    readonly property int expandedW: 1150
+    readonly property int expandedH: 652
+    readonly property int collapsedW: 296
+    readonly property int collapsedH: 172
+    readonly property int baseW: expanded ? expandedW : collapsedW
+    readonly property int baseH: expanded ? expandedH : collapsedH
 
     width: Math.round(baseW * zoom)
     height: Math.round(baseH * zoom)
@@ -61,13 +66,14 @@ Window {
 
     function persist() { layout.saveState(widgetId, root.cardX, root.cardY, root.zoom) }
 
-    // 按当前折叠/展开态摆放窗口:展开=屏幕居中;折叠=卡片主位置
-    // 用 baseW/baseH(随 expanded 立即生效)算尺寸,避免读到滞后的 root.width 导致右偏
-    function applyPosition() {
+    // 定位:展开=屏幕居中;折叠=卡片主位置。仅设 x/y,尺寸由 width/height 绑定瞬时跟随。
+    // 居中用 expandedW/expandedH 直接算,绕开 baseW/baseH 绑定的"滞后一帧"——
+    // 否则在 onExpandedChanged 内会用折叠尺寸算中心,导致展开窗口右下偏移。
+    function applyGeom() {
         _restoring = true
         if (expanded) {
-            var w = Math.round(baseW * zoom)
-            var h = Math.round(baseH * zoom)
+            var w = Math.round(expandedW * zoom)
+            var h = Math.round(expandedH * zoom)
             root.x = Math.round((Screen.width  - w) / 2) + Screen.virtualX
             root.y = Math.round((Screen.height - h) / 2) + Screen.virtualY
         } else {
@@ -76,17 +82,21 @@ Window {
         }
         _restoring = false
     }
-    // 立即定位一次,并在尺寸变化落定后(KWin resize)再居中一次兜底
+
+    function expand()   { if (!expanded) expanded = true }
+    function collapse() { if (expanded)  expanded = false }
+
+    // 展开/折叠瞬时生效:展开时复位到今天 + 居中;折叠时回卡片位。单次定位,不二次居中(那是"先居中再展开"跳变之源)。
     onExpandedChanged: {
         if (expanded) { viewYear = curYear; viewMonth = curMonth; selectedDay = curToday }
-        applyPosition(); Qt.callLater(applyPosition)
+        applyGeom()
     }
 
     Component.onCompleted: {
         var p = layout.getState(widgetId).split(",")
         root.cardX = parseInt(p[0]); root.cardY = parseInt(p[1])
         root.zoom = parseFloat(p[2]) || 1.0
-        applyPosition()
+        applyGeom()
         var T = demoTasks.list
         for (var i = 0; i < T.length; i++)
             taskStore.append({ text: T[i].text, tag: T[i].tag, tc: T[i].tc, done: false })
@@ -131,7 +141,7 @@ Window {
             onWheel: function (ev) {
                 var step = ev.angleDelta.y > 0 ? 0.06 : -0.06
                 root.zoom = Math.max(0.6, Math.min(2.2, root.zoom + step))
-                root.applyPosition()   // 缩放改变尺寸:展开态重新居中,折叠态保持卡片原位
+                root.applyGeom()       // 缩放改变尺寸:折叠态保持卡片原位
                 root.persist()
             }
         }
@@ -145,13 +155,14 @@ Window {
             timeText: root.timeText
             ampm: root.ampm
             dateText: root.dateLong
-            onExpandRequested: root.expanded = true
+            onExpandRequested: root.expand()
         }
 
-        // 展开态仪表盘(Loader:每次展开重建以重播入场动画)
+        // 展开态仪表盘常驻预热(active: true):避免每次展开重建 Loader,
+        // 否则 Dashboard 内各卡片的 Rising 错峰淡入会重放 → 展开瞬间出现"空白后逐张填充"。
         Loader {
             id: dashLoader
-            active: root.expanded
+            active: true
             visible: root.expanded
             x: 6; y: 6
             sourceComponent: Component {
@@ -173,7 +184,7 @@ Window {
                     onTodayClicked: root.goToday()
                     onPrevMonth: root.prevMonth()
                     onNextMonth: root.nextMonth()
-                    onCloseClicked: root.expanded = false
+                    onCloseClicked: root.collapse()
                 }
             }
         }

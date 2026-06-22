@@ -44,26 +44,12 @@ Item {
     // 避免透明桌面窗口在 KWin 下出现大块半透明残影。
     component Rising: Item {
         id: ri
-        default property alias content: fade.data
+        default property alias content: holder.data
         property int delay: 0
-        opacity: 1
 
         Item {
-            id: fade
+            id: holder
             anchors.fill: parent
-            opacity: 0
-            visible: opacity > 0
-            transform: Translate { id: rise; y: 10 }
-
-            Component.onCompleted: anim.restart()
-            SequentialAnimation {
-                id: anim
-                PauseAnimation { duration: ri.delay }
-                ParallelAnimation {
-                    NumberAnimation { target: fade; property: "opacity"; to: 1; duration: 180; easing.type: Easing.OutCubic }
-                    NumberAnimation { target: rise; property: "y"; to: 0; duration: 180; easing.type: Easing.OutCubic }
-                }
-            }
         }
     }
 
