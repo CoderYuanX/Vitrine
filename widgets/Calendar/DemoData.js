@@ -17,22 +17,10 @@ var LEGEND = [
     { label: "假期", color: CAT.holiday }
 ];
 
-// 本周(演示)
-var TASKS_WEEK = [
-    { text: "评审季度预算", date: "本周五" },
-    { text: "预订机票",     date: "本周六" }
-];
-
-// 天气(演示)
+// 天气(离线兜底,API 不可用时显示)
 var WEATHER = {
     city: "北京", cityFull: "北京市",
     temp: "18°", desc: "多云", hi: "↑ 21°", lo: "↓ 12°", humidity: "63%"
-};
-
-// 效率(演示)
-var PRODUCTIVITY = {
-    meetings: "3", tasksDone: "5", focus: "6.5h", progress: 0.72,
-    note: "进展不错,继续保持!"
 };
 
 // 农历 / 笔记(占位,非真实历法)
