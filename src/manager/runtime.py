@@ -7,7 +7,7 @@ class WidgetRuntime:
     """管理桌面小组件卡片窗口:按 id 显示/隐藏,每卡片一个独立 QML engine。"""
 
     def __init__(self, app, widgets, config, layout_bridge, event_bridge=None,
-                 weather_bridge=None, calendar_info_bridge=None):
+                 weather_bridge=None, calendar_info_bridge=None, task_bridge=None):
         self.app = app
         self.widgets = widgets
         self.config = config
@@ -15,6 +15,7 @@ class WidgetRuntime:
         self.event_bridge = event_bridge
         self.weather_bridge = weather_bridge
         self.calendar_info_bridge = calendar_info_bridge
+        self.task_bridge = task_bridge
         self.engines = {}
 
     def bootstrap(self, default_on):
@@ -44,6 +45,8 @@ class WidgetRuntime:
             eng.rootContext().setContextProperty("weather", self.weather_bridge)
         if self.calendar_info_bridge is not None:
             eng.rootContext().setContextProperty("calendarInfo", self.calendar_info_bridge)
+        if self.task_bridge is not None:
+            eng.rootContext().setContextProperty("tasks", self.task_bridge)
         eng.load(QUrl.fromLocalFile(meta["qml"]))
         roots = eng.rootObjects()
         if not roots:

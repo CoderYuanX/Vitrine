@@ -48,6 +48,7 @@ class ManagerApp:
         from .event_bridge import EventBridge
         from .weather_bridge import WeatherBridge
         from .calendar_info import CalendarInfoBridge
+        from .task_bridge import TaskBridge
         from .runtime import WidgetRuntime
         self.registry = WidgetRegistry(PROJECT_ROOT / "widgets")
         self.config = ConfigStore()
@@ -56,11 +57,13 @@ class ManagerApp:
         self.weather_bridge = WeatherBridge(config=self.config)
         self.weather_bridge.start()
         self.calendar_info_bridge = CalendarInfoBridge()
+        self.task_bridge = TaskBridge()
         self.widgets = self.registry.discover()
         self.runtime = WidgetRuntime(self.app, self.widgets, self.config,
                                      self.layout_bridge, self.event_bridge,
                                      self.weather_bridge,
-                                     self.calendar_info_bridge)
+                                     self.calendar_info_bridge,
+                                     task_bridge=self.task_bridge)
         self.manager_engine = None   # Task 7 填充
 
         from .catalog_bridge import CatalogBridge
