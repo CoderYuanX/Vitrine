@@ -15,7 +15,6 @@ Item {
     property string ampm: "AM"
     property string dateLabel: "Tue, May 20"
     property string fullDateLabel: "Tuesday, May 20"
-    property var tasksModel
     property var winRef: null          // 宿主 Window 引用(用于 startSystemMove)
     property color accent: "#2f6bff"
     signal daySelected(int day)
@@ -81,7 +80,7 @@ Item {
                 } }
 
             Rising { x: root.c0; y: root.r1; width: 252; height: 200 + root.gap + 192; delay: 180
-                TasksCard { anchors.fill: parent; todayModel: root.tasksModel; accent: root.accent } }
+                TasksCard { anchors.fill: parent; todayIso: root.todayIso; accent: root.accent } }
 
             Rising { x: root.c1; y: root.r0; width: 238 + root.gap + 238; height: 188 + root.gap + 200; delay: 140
                 CalendarCard {

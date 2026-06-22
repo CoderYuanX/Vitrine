@@ -61,9 +61,6 @@ Window {
     // Qt.Tool:桌面挂件不进任务栏(映射即排除,无 200ms 缺口,不依赖 dock 是否认 skip-taskbar)
     flags: Qt.FramelessWindowHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus
 
-    // 演示任务模型(可切换 done,会话内)
-    ListModel { id: taskStore }
-
     function persist() { layout.saveState(widgetId, root.cardX, root.cardY, root.zoom) }
 
     // 定位:展开=屏幕居中;折叠=卡片主位置。仅设 x/y,尺寸由 width/height 绑定瞬时跟随。
@@ -97,9 +94,6 @@ Window {
         root.cardX = parseInt(p[0]); root.cardY = parseInt(p[1])
         root.zoom = parseFloat(p[2]) || 1.0
         applyGeom()
-        var T = demoTasks.list
-        for (var i = 0; i < T.length; i++)
-            taskStore.append({ text: T[i].text, tag: T[i].tag, tc: T[i].tc, done: false })
     }
 
     // 拖动后(系统移动)防抖保存位置;只在折叠态、非程序化定位时记录卡片主位置
@@ -116,15 +110,6 @@ Window {
     Timer {
         interval: 1000; running: true; repeat: true; triggeredOnStart: true
         onTriggered: root.now = new Date()
-    }
-
-    QtObject {
-        id: demoTasks
-        property var list: [
-            { text: "整理项目方案", tag: "工作", tc: "#7c3aed" },
-            { text: "回复客户邮件", tag: "工作", tc: "#7c3aed" },
-            { text: "买菜准备晚餐", tag: "个人", tc: "#16a34a" }
-        ]
     }
 
     // 缩放后的内容画布(整卡缩放,与 Clock 一致)
@@ -177,7 +162,6 @@ Window {
                     ampm: root.ampm
                     dateLabel: root.selectedDateLabel
                     fullDateLabel: root.dateLong
-                    tasksModel: taskStore
                     winRef: root
                     accent: "#2f6bff"
                     onDaySelected: function (d) { root.selectedDay = d }
