@@ -102,7 +102,10 @@ Item {
                 } }
 
             Rising { x: root.c1; y: root.r2; width: 238; height: 192; delay: 260
-                ProductivityCard { anchors.fill: parent; accent: root.accent } }
+                ProductivityCard {
+                    anchors.fill: parent; accent: root.accent
+                    todayIso: root.todayIso; year: root.year; month: root.month; today: root.today
+                } }
 
             Rising { x: root.c2; y: root.r2; width: 238; height: 192; delay: 300
                 UpcomingCard { anchors.fill: parent; accent: root.accent; todayIso: root.todayIso } }
