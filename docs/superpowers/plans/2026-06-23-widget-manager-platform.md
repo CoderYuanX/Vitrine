@@ -1862,8 +1862,14 @@ def test_send_before_connect_is_queued_and_delivered():
 
 
 def test_stop_interrupts_reconnect_backoff():
-    # 连一个没人监听的端口 → client 进入重连退避;stop() 必须能立刻唤醒并让线程退出
-    client = CoreClient("127.0.0.1", 1, "secret", on_event=lambda m: None, on_state=lambda s: None)
+    import socket as _socket
+    # 动态取一个空闲端口再关闭,确保无人监听(比硬编码 127.0.0.1:1 更稳)
+    _s = _socket.socket()
+    _s.bind(("127.0.0.1", 0))
+    dead_port = _s.getsockname()[1]
+    _s.close()
+    # 连这个没人监听的端口 → client 进入重连退避;stop() 必须能立刻唤醒并让线程退出
+    client = CoreClient("127.0.0.1", dead_port, "secret", on_event=lambda m: None, on_state=lambda s: None)
     client.start()
     time.sleep(0.4)                                       # 让它至少进入一次退避等待
     t0 = time.time()
