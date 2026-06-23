@@ -87,7 +87,10 @@
 - **第一版采用轻量 token 鉴权**(关闭跨用户漏洞,且不引入复杂认证):
   - 底座启动时生成随机 token,写入 runtime 文件 `core.json`,该文件**权限设为 `0600`(仅属主可读)**。
   - 客户端连接后,首条消息须携带 `token`;不带或不符 → 回 `error` + `unauthorized` 并断开。
-  - 其他用户读不到 `0600` 的 token 文件,因而无法控制;当前用户的进程(面板)能读到。这是成本极低的正确做法,且为将来 Web 小组件保留了 TCP/WebSocket 形态(宿主把 token 注入给小组件)。
+  - 其他用户读不到 `0600` 的 token 文件,因而无法控制;当前用户的进程(面板)能读到。这是成本极低的正确做法,且为将来 Web 小组件保留了 TCP/WebSocket 形态。
+- **权限分级(关键安全约束,现在就钉死)**:本版这个 token 是**全控 token**——能 `shutdown`、`set_provider`、`set_interval`,**只发给可信的管理面板**。
+  - **将来的第三方 Web 小组件绝不能拿到这个全控 token**,否则小组件就能关停/重配底座,而它本该只能订阅数据。
+  - 后续做小组件宿主时走两条任选其一(留待那阶段设计,本版仅锁定原则):①宿主进程持有全控 token,只向小组件暴露**受限的 `mw.subscribe()` 代理**,小组件自己连不到 core 的控制面;②底座引入 **read-only / capability token**(只读 token 仅允许 `hello`+`subscribe`+`unsubscribe`,不允许任何控制动作),宿主发只读 token 给小组件。
 - 仍非目标:网络访问、跨机、强身份。后续若需更强隔离再考虑 Unix domain socket。
 
 端口:默认 `35355`,占用则顺延;实际端口与 token 通过 runtime 状态文件(`0600`)对外公布(见 3.4),不靠面板猜。
@@ -296,8 +299,9 @@ managewidgets/
 
 ## 8. 后续路线图(本版之后)
 
-1. **小组件宿主(X11)**:无边框 keep-below 桌面层窗口;**窗口内嵌 WebKitGTK WebView 渲染小组件,不用 GTK 原生控件画小组件**;锁定/编辑两态;位置持久化(显示器 + 相对坐标);可选点击穿透。透明背景 + 合成器支持,让动效小组件能透出桌面。
-2. **Web 小组件包**:`manifest.json` + `index.html`;UI 用 HTML/CSS/JS,**动效支持目标 = CSS 动画/过渡、JS、Canvas 2D、SVG;WebGL 尽力支持**;注入 `mw.subscribe(topic, cb)` 薄封装;`~/.local/share/managewidgets/widgets/` 扫描即装。
+0. **宿主技术验证(spike,先于正式宿主开发)**:在目标桌面环境(至少 Deepin/X11,有条件再加 KDE/GNOME-X11、XFCE)上验证 **WebKitGTK 的:① 透明窗口背景能否真正透出桌面;② CSS 动画/过渡 + Canvas 2D 动效是否流畅稳定;③ 点击穿透是否可靠;④ WebGL 是否可用(尽力项)**。这是宿主选型的技术验收门槛——若 WebKitGTK 在透明/合成器/WebGL 上表现不达标,需在此 spike 阶段就暴露并重选载体,不拖到宿主写完才发现。
+1. **小组件宿主(X11)**:无边框 keep-below 桌面层窗口;**窗口内嵌 WebKitGTK WebView 渲染小组件,不用 GTK 原生控件画小组件**;锁定/编辑两态;位置持久化(显示器 + 相对坐标);可选点击穿透。透明背景 + 合成器支持,让动效小组件能透出桌面。**宿主持有全控 token,只向小组件暴露受限 `mw.subscribe()` 代理或只读 token(见 §3.3 权限分级),小组件拿不到控制权限。**
+2. **Web 小组件包**:`manifest.json` + `index.html`;UI 用 HTML/CSS/JS,**动效支持目标 = CSS 动画/过渡、JS、Canvas 2D、SVG;WebGL 尽力支持**;注入 `mw.subscribe(topic, cb)` 薄封装(背后是受限代理/只读 token,不暴露 `shutdown`/`set_*`);`~/.local/share/managewidgets/widgets/` 扫描即装。
 3. **更多 Provider**:天气(wttr.in 无 key 或 OpenWeatherMap)、MPRIS 媒体、磁盘/网络/温度。
 4. **管理面板补全**:小组件列表 + 开关、设置表单(读 manifest schema 自动生成)、布局编辑。
 5. **Wayland 宿主后端**:wlr-layer-shell(wlroots/KWin);GNOME-Wayland 退化为普通窗口并说明限制。
