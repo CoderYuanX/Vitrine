@@ -86,10 +86,30 @@ class Hub:
                               "status": status, "topics": topics})
         return providers
 
-    # ---- 请求处理(本 task:已鉴权的数据类动作)----
+    # ---- 请求处理(鉴权 + 控制动作 + 校验 + 数据类动作)----
     def handle(self, conn: Conn, msg: dict) -> Reply:
+        from core.config import INTERVAL_MAX, INTERVAL_MIN
+        if not isinstance(msg, dict) or "action" not in msg:
+            return Reply(direct=[{"type": "error", "id": (msg or {}).get("id") if isinstance(msg, dict) else None,
+                                  "code": "bad_request", "message": "missing action"}])
         action = msg.get("action")
         rid = msg.get("id")
+
+        # 鉴权门:未鉴权时只允许 hello
+        if not conn.authed:
+            if action != "hello":
+                return Reply(direct=[{"type": "error", "id": rid,
+                                      "code": "unauthorized", "message": "must authenticate first"}],
+                             close=True)
+            if msg.get("token") != self._token:
+                return Reply(direct=[{"type": "error", "id": rid,
+                                      "code": "unauthorized", "message": "bad token"}], close=True)
+            conn.authed = True
+            return Reply(direct=[{"type": "ok", "id": rid}])
+
+        if action == "hello":
+            return Reply(direct=[{"type": "ok", "id": rid}])
+
         if action == "subscribe":
             unknown = [t for t in msg.get("topics", []) if t not in self._topic_provider]
             if unknown:
@@ -97,10 +117,41 @@ class Hub:
                                       "code": "unknown_topic", "message": f"unknown topic: {unknown[0]}"}])
             conn.subscriptions.update(msg.get("topics", []))
             return Reply(direct=[{"type": "ok", "id": rid}])
+
         if action == "unsubscribe":
             conn.subscriptions.difference_update(msg.get("topics", []))
             return Reply(direct=[{"type": "ok", "id": rid}])
+
         if action == "list_providers":
             return Reply(status_request_id=rid)            # server 据 id 回完整 status
+
+        if action == "set_provider":
+            pid = msg.get("provider")
+            if pid not in self._providers:
+                return Reply(direct=[{"type": "error", "id": rid,
+                                      "code": "unknown_provider", "message": f"unknown provider: {pid}"}])
+            enabled = bool(msg.get("enabled", True))
+            self._enabled[pid] = enabled
+            self._config.providers_enabled[pid] = enabled    # 同步回 config
+            self._persist()                                  # 持久化(运行中改动写回)
+            return Reply(direct=[{"type": "ok", "id": rid}], broadcast_status=True)
+
+        if action == "set_interval":
+            topic = msg.get("topic")
+            if topic not in self._topic_provider:
+                return Reply(direct=[{"type": "error", "id": rid,
+                                      "code": "unknown_topic", "message": f"unknown topic: {topic}"}])
+            iv = msg.get("interval")
+            if not isinstance(iv, (int, float)) or isinstance(iv, bool) or not (INTERVAL_MIN <= iv <= INTERVAL_MAX):
+                return Reply(direct=[{"type": "error", "id": rid, "code": "invalid_interval",
+                                      "message": f"interval must be in [{INTERVAL_MIN}, {INTERVAL_MAX}]"}])
+            self._config.intervals[topic] = float(iv)
+            self._persist()                                  # 持久化(运行中改动写回)
+            return Reply(direct=[{"type": "ok", "id": rid}], broadcast_status=True,
+                         repoll=[topic], reset_timer=[topic])
+
+        if action == "shutdown":
+            return Reply(direct=[{"type": "ok", "id": rid}], shutdown=True)
+
         return Reply(direct=[{"type": "error", "id": rid,
                               "code": "bad_request", "message": f"unknown action: {action}"}])

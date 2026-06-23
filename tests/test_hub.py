@@ -1,4 +1,4 @@
-from core.config import Config
+from core.config import INTERVAL_MAX, INTERVAL_MIN, Config
 from core.hub import Conn, Hub
 from core.providers.system import SystemProvider
 from core.providers.time import TimeProvider
@@ -67,3 +67,98 @@ def test_list_providers_signals_status_request():
     # Hub 不直接建完整 status(缺 port/clients/uptime),只signal server 用 id 回 status
     assert reply.status_request_id == "r3"
     assert reply.direct == []
+
+
+def test_unauthed_non_hello_rejected():
+    h = make_hub()
+    conn = Conn(authed=False)
+    reply = h.handle(conn, {"id": "a", "action": "subscribe", "topics": ["system.cpu"]})
+    assert reply.direct[0]["type"] == "error"
+    assert reply.direct[0]["code"] == "unauthorized"
+    assert reply.close is True
+    assert "system.cpu" not in conn.subscriptions
+
+
+def test_hello_wrong_token_rejected():
+    h = make_hub()
+    conn = Conn(authed=False)
+    reply = h.handle(conn, {"id": "h", "action": "hello", "token": "WRONG"})
+    assert reply.direct[0]["code"] == "unauthorized"
+    assert reply.close is True
+    assert conn.authed is False
+
+
+def test_hello_correct_token_authes():
+    h = make_hub()
+    conn = Conn(authed=False)
+    reply = h.handle(conn, {"id": "h", "action": "hello", "token": "secret"})
+    assert conn.authed is True
+    assert reply.direct[0] == {"type": "ok", "id": "h"}
+
+
+def test_set_provider_disables_and_broadcasts():
+    h = make_hub()
+    reply = h.handle(Conn(authed=True), {"id": "s", "action": "set_provider",
+                                         "provider": "system", "enabled": False})
+    assert reply.direct[0] == {"type": "ok", "id": "s"}
+    assert reply.broadcast_status is True
+    assert h.is_active("system.cpu") is False
+
+
+def test_set_provider_unknown():
+    h = make_hub()
+    reply = h.handle(Conn(authed=True), {"action": "set_provider", "provider": "ghost", "enabled": True})
+    assert reply.direct[0]["code"] == "unknown_provider"
+
+
+def test_set_interval_valid_repolls():
+    h = make_hub()
+    reply = h.handle(Conn(authed=True), {"id": "i", "action": "set_interval",
+                                         "topic": "system.cpu", "interval": 3.0})
+    assert reply.direct[0] == {"type": "ok", "id": "i"}
+    assert h.interval("system.cpu") == 3.0
+    assert reply.repoll == ["system.cpu"]
+    assert reply.reset_timer == ["system.cpu"]
+    assert reply.broadcast_status is True
+
+
+def test_set_interval_out_of_range():
+    h = make_hub()
+    for bad in [0.1, 99999, "x", -1, True, False]:
+        reply = h.handle(Conn(authed=True), {"action": "set_interval",
+                                             "topic": "system.cpu", "interval": bad})
+        assert reply.direct[0]["code"] == "invalid_interval"
+    assert h.interval("system.cpu") == 1.0                # 未被改动
+
+
+def test_set_interval_unknown_topic():
+    h = make_hub()
+    reply = h.handle(Conn(authed=True), {"action": "set_interval", "topic": "no.x", "interval": 2})
+    assert reply.direct[0]["code"] == "unknown_topic"
+
+
+def test_shutdown():
+    h = make_hub()
+    reply = h.handle(Conn(authed=True), {"id": "q", "action": "shutdown"})
+    assert reply.direct[0] == {"type": "ok", "id": "q"}
+    assert reply.shutdown is True
+
+
+def test_bad_request_missing_action():
+    h = make_hub()
+    reply = h.handle(Conn(authed=True), {"id": "b"})
+    assert reply.direct[0]["code"] == "bad_request"
+
+
+def test_set_provider_and_interval_persist_via_on_change():
+    from core.config import Config
+    saved = []
+    cfg = Config.default()
+    h = Hub([SystemProvider(), TimeProvider()], cfg, token="secret",
+            on_change=lambda c: saved.append((dict(c.providers_enabled), dict(c.intervals))))
+    h.handle(Conn(authed=True), {"action": "set_provider", "provider": "system", "enabled": False})
+    h.handle(Conn(authed=True), {"action": "set_interval", "topic": "system.cpu", "interval": 4.0})
+    assert len(saved) == 2                                 # 每次改动都触发持久化
+    assert cfg.providers_enabled["system"] is False        # 同步回了 config 对象
+    assert cfg.intervals["system.cpu"] == 4.0
+    assert saved[-1][0]["system"] is False and saved[-1][1]["system.cpu"] == 4.0
