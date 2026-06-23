@@ -83,14 +83,14 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 行为:
 - **校验 `component`**(回应评审 3-5):仅接受 `"core"` / `"manager"`,其余直接 `ValueError`,杜绝意外用任意值生成任意文件名日志(也与启动清理的固定前缀保持一致)。
 - 在 `log_dir` 下建目录;**无论目录是否已存在,都 `chmod(0o700)`**(回应评审 2-2)—— `mkdir(exist_ok=True)` 不会收紧已存在的宽权限目录,必须显式 chmod。随后执行**启动清理**(删 > retention_days 的旧日志)。
-- 解析级别:`level` 入参 > env `MANAGEWIDGETS_LOG_LEVEL` > 缺省 INFO。接受**大小写不敏感**的名称 `DEBUG/INFO/WARNING/ERROR/CRITICAL` 及对应整数字符串;**非法值回退 INFO**。解析函数返回 `(numeric_level, warning_or_None)`;**该回退 WARNING 必须在 handler 挂好之后**用组件 logger 发出(回应评审 2-4),否则会丢失或只进 lastResort。
+- 解析级别:`level` 入参 > env `MANAGEWIDGETS_LOG_LEVEL` > 缺省 INFO。接受**大小写不敏感**的名称 `DEBUG/INFO/WARNING/ERROR/CRITICAL`,以及**仅限标准数值** `10/20/30/40/50`(及其字符串形式)(回应评审 4-3:不接受 `1`/`999` 等任意整数,否则 handler 行为令人困惑);其余一律视为非法,**回退 INFO**。该回退路径对 `level` 入参与 env 两条来源都生效(回应评审 4-2)。解析函数返回 `(numeric_level, warning_or_None)`;**该回退 WARNING 必须在 handler 挂好之后**用组件 logger 发出(回应评审 2-4),否则会丢失或只进 lastResort。
 - 把组件 logger 级别设为解析出的数值级别,使记录能下发到 handler;各 handler 再按自身级别过滤。
 - 给该 **组件 logger** 挂两个 handler:
   - `TimedRotatingFileHandler` → `{component}.log`,级别 = 解析级别。
   - `StreamHandler(sys.stderr)`,级别 = `max(numeric_level, logging.WARNING)` —— 终端只显示要紧的,不被 INFO 刷屏;若 env 把级别调到 ERROR,则 stderr 同步收紧到 ERROR。
 - **文件权限 `0o600`**(回应评审 2):日志含 pid/port/路径/堆栈等本地诊断信息,与 `core.json` 的 0600 一致。做法:子类化 `TimedRotatingFileHandler` 并**重写 `_open()`**,内部仍调内置 `open(self.baseFilename, self.mode, encoding=self.encoding, opener=lambda path, flags: os.open(path, flags, 0o600))` —— `open` 的 `opener` 回调收 `(path, flags)`、用 `os.open` 以 0o600 创建并返回 fd(**不是**把整个 `_open` 换成 `os.open`,它需返回 stream 而非 fd)。如此**初始与轮转新建**的文件都是 0600。
 - **幂等**:重入时先移除组件 logger 上带 `_managewidgets=True` 标记的旧 handler 再挂。保障测试与潜在多次调用安全。
-- **挂好 handler 后写一条启动行**(回应评审 3-1):`setup_logging` 自身发 `logger.info("logging initialized: component=… level=… retention=…d file=<path>")`(均为非敏感字段)。这让文件创建语义明确、测试 1 有确定内容可读,并把级别回退 WARNING(若有)按正确顺序落盘。
+- **挂好 handler 后写一条启动行**(回应评审 3-1):`setup_logging` 自身发 `logger.info("logging initialized: component=… level=… retention=…d file=<path>")`(均为非敏感字段)。注意它是 **INFO,受当前级别约束**(回应评审 4-1):默认 INFO 时落盘,若级别被调到 WARNING+ 则不写——这是正常 logger 语义,**不**为它破例(用 `logger.log(level,…)` 在 ERROR 下写"logging initialized"会很怪)。因此「确定可读内容」不依赖它:测试 1 自己写一条 INFO 再读。
 - 返回主日志文件 `Path`。
 
 调用点:
@@ -120,7 +120,7 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 
 新增 `tests/test_logs.py`(纯逻辑,不依赖 GTK,不碰真实 home —— 全部 `log_dir=tmp_path` 注入)。**测试隔离**(回应评审 3-2):用一个 fixture 在每个用例前后,对 `core` / `manager` logger **移除本系统 handler 并把 `propagate` 还原为 `True`、level 还原**,避免 `propagate=False` 等改动串扰后续用例(也含本套件外的用例):
 
-1. `setup_logging` 在指定 `log_dir` 建出 `{component}.log`,写一条 INFO 后**读文件**确认含该行。
+1. `setup_logging`(默认级别)在指定 `log_dir` 建出 `{component}.log`,**测试自己**用组件 logger 写一条 INFO 后**读文件**确认含该行(不依赖启动行,因其受级别约束)。
 2. 级别:`level="WARNING"`(或 env)时 INFO 不落、WARNING 落。
 3. 幂等:连续调用两次,组件 logger 上本系统 handler 数不翻倍。
 4. **同进程隔离**(回应评审 1-1):同一进程先 `setup_logging("core", log_dir=tmp)` 再 `setup_logging("manager", log_dir=tmp)`,分别用 `core.x` / `manager.x` logger 各写一条,断言**各自只进各自文件、不串台**。
@@ -129,6 +129,7 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 7. **启动清理 + 不误删 + 清两端遗留**(回应评审 2-5):造 `core.log.old`(mtime 8 天前)、近期 `core.log`、过期 `manager.log.old`(mtime 8 天前)、以及非本系统文件 `other.log.old` / `notes.txt`。`setup_logging("core", retention_days=7)` 后:过期的 `core.log.old` **与** `manager.log.old` 都被删(证明两端遗留旧文件都清),近期文件保留,`other.log.old` / `notes.txt` **不动**(证明只认 `core.log*`/`manager.log*` 前缀)。
 8. `retention_days` 经 env `MANAGEWIDGETS_LOG_RETENTION_DAYS` 可覆盖;非整数 / ≤0 回退默认 7。
 9. **级别非法回退已落盘**(回应评审 2-4/5):`MANAGEWIDGETS_LOG_LEVEL="bogus"` → 实际级别为 INFO,且**读 `{component}.log`** 确认回退 WARNING 已写入文件(证明 warning 在 handler 挂好后才发)。
+10. **回退覆盖入参路径与越界整数**(回应评审 4-2/4-3):`setup_logging(component, level="bogus")` 也回退 INFO(与 env 路径独立);`level="999"` / `level=999`(非标准数值)同样回退 INFO,而 `level="30"` / `level=30` 正常解析为 WARNING。
 
 埋点侧(回应评审 7,证明落盘链路完整而非仅 logger 被调用):在 `tests/test_core_integration.py` 先 `setup_logging("core", log_dir=tmp_path)`,跑 `BoomProvider` 触发 poll 异常,**读 `core.log`** 断言含 provider 名 / topic / 异常文本(`boom`)。
 
