@@ -136,3 +136,18 @@ def test_corrupt_config_surfaces_config_reset_notice(tmp_path):
     finally:
         proc.terminate(); proc.wait(timeout=5)
     assert len(list(cfg.parent.glob("config.toml.bak.*"))) == 1   # 损坏文件已备份
+
+
+def test_core_writes_log_file(tmp_path):
+    proc = subprocess.Popen([PY, "-m", "core"], env=_env(tmp_path))
+    try:
+        _wait_runtime(_runtime(tmp_path))
+        log = tmp_path / ".local" / "state" / "managewidgets" / "logs" / "core.log"
+        end = time.time() + 5
+        while time.time() < end and not log.exists():
+            time.sleep(0.1)
+        assert log.exists()
+        assert oct(os.stat(log).st_mode)[-3:] == "600"
+        assert "logging initialized" in log.read_text()
+    finally:
+        proc.terminate(); proc.wait(timeout=5)
