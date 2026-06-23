@@ -53,12 +53,14 @@ class ManagerApp(Gtk.Application):
         nb.append_page(WidgetsPlaceholderPage(), Gtk.Label(label="小组件"))
         win.add(nb)
         win.connect("delete-event", self._on_close)       # 接管 ×,不直接销毁
+        win.connect("window-state-event", self._on_window_state)  # 最小化 → 收进托盘,不留 dock 条目
         win.show_all()
 
         self._tray = self._build_tray()                   # 缺库 → None(降级)
         if self._tray is not None:
             self.hold()                                   # 仅有托盘时 hold,隐藏窗口不退出
             self._held = True
+            self._tray.refresh_window_item(True)          # 窗口已 show_all → 菜单初始即「隐藏面板」
 
         self._connect_client()
         GLib.timeout_add(2000, self._maybe_autostart_core)  # 宽限期:~2s 未连上则拉核
@@ -75,8 +77,11 @@ class ManagerApp(Gtk.Application):
                 on_quit=self._quit,
                 autostart_enabled=is_autostart_enabled(),
             )
-        except Exception as exc:                          # 缺 AyatanaAppIndicator3 等 → 降级
+        except Exception as exc:                          # 缺 AyatanaAppIndicator3 等 → 降级(任何托盘初始化失败都不该拖垮面板)
+            # 仍保留 catch-all 以兑现「缺库优雅降级」,但打全栈,避免把真实编程错误静默吞成「无托盘」
+            import traceback
             print(f"[manager] 托盘不可用,降级为普通窗口: {exc}", file=sys.stderr)
+            traceback.print_exc()
             return None
 
     def _on_close(self, *args):
@@ -115,6 +120,19 @@ class ManagerApp(Gtk.Application):
             self._quit()
         # 其它(关掉对话框)→ 窗口保持,不动作
         return True
+
+    def _minimize_should_hide(self, iconified):
+        # 托盘存在时,最小化(iconify)应改为收进托盘(hide 才能从 dock/任务栏移除条目);
+        # 无托盘(降级)时保持系统默认最小化,否则窗口最小化即消失且无处可唤回。
+        return bool(iconified) and self._tray is not None
+
+    def _on_window_state(self, win, event):
+        from gi.repository import Gdk
+        iconified = bool(event.new_window_state & Gdk.WindowState.ICONIFIED)
+        if (event.changed_mask & Gdk.WindowState.ICONIFIED) and self._minimize_should_hide(iconified):
+            win.deiconify()                                # 清掉 iconified 态,下次唤出才干净
+            self._hide_window()                            # hide():从 dock/任务栏彻底移除条目
+        return False
 
     def _hide_window(self):
         self._win.hide()
@@ -184,7 +202,13 @@ class ManagerApp(Gtk.Application):
         self._start_polls_active = True
         rt = read_runtime(self._runtime_path())
         self._prev_started_at = rt.get("started_at") if rt else None   # 记旧实例时间戳
-        subprocess.Popen([sys.executable, "-m", "core"])
+        try:
+            subprocess.Popen([sys.executable, "-m", "core"])
+        except OSError as exc:                            # 拉起失败:回滚防重入标志,否则后续「启动底座」被永久挡住
+            print(f"[manager] 启动底座失败: {exc}", file=sys.stderr)
+            self._start_polls_active = False
+            self._on_state("disconnected")               # 未连上(非鉴权失败),概览/托盘置灰
+            return
         self._start_polls = 0
         GLib.timeout_add(500, self._reconnect_when_ready)
 

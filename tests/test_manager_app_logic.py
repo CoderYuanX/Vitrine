@@ -99,3 +99,38 @@ def test_reconnect_when_ready_gives_up_after_timeout(monkeypatch):
     assert app._reconnect_when_ready() is False  # 到上限 → 停轮询
     assert reconnects == []                      # 超时不重连
     assert app._start_polls_active is False
+
+
+def test_minimize_hides_to_tray_only_when_tray_present():
+    # 最小化(iconify)行为:有托盘 → 收进托盘(返回 True 表示应 hide,不留 dock 条目);
+    # 无托盘(降级)→ 保持系统默认最小化(False),否则窗口最小化即消失且无处唤回。
+    app = _app()
+    app._tray = object()
+    assert app._minimize_should_hide(True) is True       # 有托盘 + 最小化 → 收托盘
+    assert app._minimize_should_hide(False) is False     # 非最小化(还原)→ 不动作
+    app._tray = None
+    assert app._minimize_should_hide(True) is False      # 无托盘 → 不接管最小化
+
+
+def test_start_core_rolls_back_guard_on_popen_failure(monkeypatch):
+    # subprocess.Popen 抛 OSError 时:必须回滚 _start_polls_active,否则后续「启动底座」被永久挡住;
+    # 并把状态置为未连接(disconnected),不留下半启动的卡死态。
+    import manager.app as appmod
+    app = _app()
+    states = []
+    app._overview = type("O", (), {"set_connection": lambda self, s: states.append(s)})()
+    app._tray = None
+    app._start_polls_active = False
+    monkeypatch.setattr(appmod.subprocess, "Popen",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("boom")))
+    app._start_core()
+    assert app._start_polls_active is False       # 防重入标志已回滚
+    assert states == ["disconnected"]             # 概览置灰
+    # 回滚后应能再次尝试启动(不被早返回挡住)
+    again = []
+    monkeypatch.setattr(appmod.subprocess, "Popen",
+                        lambda *a, **k: again.append(1) or type("P", (), {})())
+    monkeypatch.setattr(appmod.GLib, "timeout_add", lambda *a, **k: 0)
+    monkeypatch.setattr(appmod, "read_runtime", lambda p: None)
+    app._start_core()
+    assert again == [1]                           # 第二次真的尝试了
