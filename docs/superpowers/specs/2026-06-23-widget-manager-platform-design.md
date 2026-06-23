@@ -136,9 +136,9 @@
   - **拿到锁** → 没有其他实例(进程死亡时内核自动释放锁,天然防 PID 复用)→ 继续启动。
   - **拿不到锁** → 已有实例在跑 → 直接退出并打印已有端口。
 - 底座启动流程:
-  1. 尝试 `flock` 实例锁;失败即已有实例,退出。
-  2. 拿到锁后,**仍校验残留 `core.json` 的可信度**:若文件里的 `pid` 存活且 `/proc/<pid>/cmdline` 确为 `managewidgets-core`、`started_at` 吻合,才信任其端口;否则视为陈旧文件丢弃。(双保险:flock 是主锁,cmdline+started_at 校验防止信任到被复用 PID 的无关进程。)
-  3. 绑定端口(默认 35355,占用顺延),生成 token,成功后**原子写入** `core.json`(写临时文件 → `chmod 0600` → `rename`)。
+  1. 尝试 `flock` 实例锁;**失败即已有有效实例在跑,退出**(可顺带读残留 `core.json` 打印旧端口供用户参考,但仅供诊断)。
+  2. **拿到锁 = 判定当前无有效 core 实例**。残留 `core.json` 一律视为陈旧,直接删除/覆盖,**不再"信任"其端口**(锁就是唯一事实来源,不需要再用 pid/cmdline 反推存活)。
+  3. 绑定端口(默认 35355,占用顺延),生成 token,**原子写入新的** `core.json`:用 `mkstemp` 在目标目录建临时文件 → **`fchmod(0600)` 后再写入 token 内容**(避免默认 umask 下 chmod 前的短暂可读窗口)→ `rename` 覆盖。
   4. 正常退出时删除 `core.json`(锁由进程退出自动释放)。
 - 面板发现底座流程:**优先读 `core.json` 拿 port + token**;读不到再退回 `config.toml` 默认端口尝试(无 token 时连接会被拒,提示需重启底座);都失败则视为底座未运行,提示一键启动。
 
@@ -189,7 +189,7 @@
 - **启动(面板"启动底座")**:面板以子进程方式拉起 `managewidgets-core`,然后按 §3.4 通过 runtime 文件发现端口+token 并连接。
 - **停止(面板"停止底座")——首选协议、不靠猜进程**:
   1. **首选**:面板发 WS `shutdown` 控制消息;底座回 `ok` 后**优雅退出**(停调度循环、断开所有客户端、删除 `core.json`、释放锁)。此路径与"谁拉起的"无关——即使底座是自启或手动跑的,只要面板能连上就能停。
-  2. **兜底**:WS 连不上但 `core.json` 存在且校验可信(pid 存活 + cmdline 匹配,见 §3.4)→ 面板向该 pid 发 `SIGTERM`;底座捕获 `SIGTERM` 同样走优雅退出。
+  2. **兜底**:WS 连不上但 `core.json` 存在 → 面板**先做防误杀校验**(`pid` 存活 + `/proc/<pid>/cmdline` 确为 `managewidgets-core`,防 PID 复用杀错进程)→ 通过才向该 pid 发 `SIGTERM`;底座捕获 `SIGTERM` 同样走优雅退出。(此校验仅用于停止安全,与 §3.4 的实例判定无关——后者只认 `flock`。)
   3. **不做**:对校验不通过 / 无法确认身份的 pid 发信号(避免误杀无关进程)——此时提示用户手动处理。
 - 底座对 `SIGTERM`/`SIGINT` 均做优雅退出:清理 `core.json`、释放 `flock`。
 - 自启:在 `~/.config/autostart/` 写入 `.desktop` 文件(XDG 标准,跨桌面通用),由面板开关控制。
@@ -250,7 +250,8 @@ GTK + PyGObject 应用。一个主窗口,左侧导航或顶部页签切换三页
 - **协议单元测试**:订阅/退订/控制消息处理;请求 `id` 正确回传;未知 topic→`unknown_topic`、坏消息→`bad_request`、越界间隔→`invalid_interval`;`set_interval` 后立即重推一次并重置周期。
 - **鉴权测试**:不发 `hello` 或 token 错→`unauthorized` 并断开;正确 token→放行;`shutdown` 触发优雅退出(清 `core.json`、释放锁)。
 - **底座集成测试**:起一个底座实例,用测试 WS 客户端订阅,断言收到 `data` 推送、改 interval 推送频率随之变化、停 provider 后该组 topic 停推而其他 provider 不受影响。
-- **端口/多实例测试**:端口被占用时底座顺延并把实际端口写入 `core.json`,测试客户端按该文件能连上;已持锁底座存在时再次启动因 `flock` 失败而直接退出、不起第二个实例;陈旧 `core.json`(pid 复用为无关进程,cmdline 不匹配)被识别为不可信、不误判为存活实例。
+- **端口/多实例测试**:端口被占用时底座顺延并把实际端口写入 `core.json`,测试客户端按该文件能连上;已持锁底座存在时再次启动因 `flock` 失败而直接退出、不起第二个实例;**拿到锁后残留 `core.json` 被覆盖而非被信任**;`core.json` 落盘后权限为 `0600`(非 group/world 可读)。
+- **停止安全测试**:`SIGTERM` 兜底前的防误杀校验——pid 复用为无关进程(cmdline 不匹配)时**不发信号**。
 - **配置健壮性测试**:`config.toml` 内容损坏时,底座把它备份为 `config.toml.bak.<ts>`、生成默认配置、正常启动,且 `status.core.notices` 含 `config_reset`。
 - **面板**:WS 客户端连接/重连退避、`id`↔响应关联可单元测;runtime 端口发现优先于配置端口;GUI 渲染做冒烟(能起、能连、能显示一次数据)。
 - 遵循 TDD:每个单元先写失败测试再实现。
@@ -303,7 +304,8 @@ managewidgets/
 
 逐项可验证清单:
 
-- [ ] `managewidgets-core` 可启动,监听 `127.0.0.1` 上的端口,并写出 `core.json`(pid/port/started_at/version)。
+- [ ] `managewidgets-core` 可启动,监听 `127.0.0.1` 上的端口,并写出 `core.json`(pid/port/**token**/started_at/version)。
+- [ ] `core.json` 文件权限为 `0600`(属主可读写,**非 group/world 可读**),token 非空。
 - [ ] `managewidgets-manager` 可启动,显示概览 / 数据源 / 小组件(占位)三页。
 - [ ] 数据源页中 `system.cpu` / `system.mem` / `time.now` 实时刷新。
 - [ ] 修改 `system.cpu` 的 interval 后,推送频率随之变化(可观测),且面板收到 `ok` 提示保存成功。
