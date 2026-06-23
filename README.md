@@ -74,7 +74,8 @@ python3 -m venv --system-site-packages .venv
 - **托盘菜单** —— 显示/隐藏面板、启动/停止底座、开机自启、退出。
   图标随连接状态变 🟢 绿 / ⚪ 灰。**退出只退面板,`core` 底座继续运行**(要停底座用菜单「停止底座」)。
 - **开机自启** —— 打开后登录即在托盘,并自动拉起底座、数据开始跳。自启的 `.desktop`
-  **历史原因沿用文件名 `managewidgets-core.desktop`,实际自启的是 `manager` 面板**(`Exec=… -m manager`)。
+  文件名为 `managewidgets-manager.desktop`(`Exec=… -m manager`,自启的是面板)。早期版本曾用
+  `managewidgets-core.desktop`,启用时会自动迁移清掉旧文件、关闭时新旧一并清除,老用户无需手动处理。
 - **缺托盘库时优雅降级** —— 若未装 `gir1.2-ayatanaappindicator3-0.1`,面板仍可运行,
   只是没有托盘图标(降级为普通窗口,关窗即退出)。
 
