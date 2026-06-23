@@ -1,8 +1,11 @@
 import asyncio
 import json
+import logging
 import threading
 
 import websockets
+
+logger = logging.getLogger(__name__)
 
 
 class CoreClient:
@@ -84,6 +87,7 @@ class CoreClient:
                     await ws.send(json.dumps({"id": "hello", "action": "hello", "token": self._token}))
                     ack = json.loads(await ws.recv())
                     if ack.get("type") != "ok":
+                        logger.warning("鉴权失败,停止重连")
                         self._on_state("error")
                         self._ws = None
                         await ws.close()
@@ -92,6 +96,7 @@ class CoreClient:
                         return
                     self._connected = True
                     had_session = True
+                    logger.info("connected to core at %s:%s", self._host, self._port)
                     self._on_state("connected")
                     backoff = 0.5
                     if self._subs:                        # 每次(重)连重订阅 + flush 暂存的控制消息

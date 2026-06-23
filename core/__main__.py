@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import signal
 import sys
@@ -7,6 +8,7 @@ import time
 
 from core import __version__
 from core.config import default_config_path, load_config, save_config
+from core.logs import setup_logging
 from core.hub import Hub
 from core.providers.system import SystemProvider
 from core.providers.time import TimeProvider
@@ -19,6 +21,8 @@ from core.state import (
     remove_runtime,
     write_runtime,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def build_hub(config, token: str, on_change=None) -> Hub:
@@ -34,10 +38,12 @@ def main(argv=None) -> int:
     if lock is None:
         existing = read_runtime(runtime_path)
         port = existing.get("port") if existing else "?"
-        print(f"managewidgets-core 已在运行(port={port}),不启动第二个实例", file=sys.stderr)
+        logger.warning("core already running (port=%s); not starting second instance", port)
         return 3
 
     remove_runtime(runtime_path)                          # 拿到锁 = 无有效实例,残留一律丢弃
+    setup_logging("core")
+    logger.info("core starting: pid=%s version=%s", os.getpid(), __version__)
     config_path = default_config_path()
     config, notices = load_config(config_path)            # 保留 notices(如 config_reset)
     token = generate_token()
@@ -80,6 +86,7 @@ def main(argv=None) -> int:
         server.stop_threadsafe()
         t.join(timeout=5)
         remove_runtime(runtime_path)
+        logger.info("core stopped")
     return 0
 
 

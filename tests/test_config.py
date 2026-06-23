@@ -40,3 +40,17 @@ def test_save_is_valid_toml(tmp_path):
     save_config(Config.default(), p)
     with p.open("rb") as f:
         tomllib.load(f)                                   # 不抛即合法
+
+
+def test_load_config_logs_warning_on_corrupt(tmp_path, caplog):
+    import logging
+
+    from core.config import load_config
+
+    p = tmp_path / "config.toml"
+    p.write_text("not valid ===")
+    with caplog.at_level(logging.WARNING, logger="core.config"):
+        cfg, notices = load_config(p)
+    assert notices and notices[0]["code"] == "config_reset"
+    assert any(r.levelno == logging.WARNING and "config" in r.getMessage().lower()
+               for r in caplog.records)

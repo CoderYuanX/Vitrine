@@ -88,10 +88,32 @@ python3 -m venv --system-site-packages .venv
 
 > 无图形显示(CI)环境下,GUI / 托盘相关用例会自动 `skip`;纯逻辑用例照常运行。
 
+## 🪵 日志
+
+两进程各写一份按天轮转、**默认保留 7 天**(自动清理)的日志,便于人/AI 排障:
+
+```
+~/.local/state/managewidgets/logs/
+  ├─ core.log       # 底座
+  └─ manager.log    # 面板
+```
+
+实时跟看:
+
+```bash
+tail -f ~/.local/state/managewidgets/logs/manager.log    # 面板
+tail -f ~/.local/state/managewidgets/logs/core.log       # 底座
+```
+
+- 目录 `0700` / 文件 `0600`;默认级别 INFO,`MANAGEWIDGETS_LOG_LEVEL=DEBUG` 可调更细。
+- 保留天数 `MANAGEWIDGETS_LOG_RETENTION_DAYS`(默认 7)。
+- provider 采集失败、连接/鉴权、控制被拒、托盘降级等均带来源与堆栈。
+
 ## 🗂️ 项目结构
 
 ```
 core/                数据底座:provider 采集、WebSocket hub、状态/配置、自启
+  └─ logs.py         setup_logging:按天轮转 + 7 天清理的落盘日志(core/manager 各一文件)
 manager/             管理面板:GTK3 多页 UI、WS 客户端、托盘封装、本地偏好
   ├─ app.py          ManagerApp:窗口 / 关窗到托盘 / 托盘 / 对话框等纯 UI + on_state/on_event 回调
   ├─ supervisor.py   CoreSupervisor:底座进程/连接生命周期(发现连接、拉起停止、就绪重连、控制下发);GTK 依赖注入,可脱 GTK 单测

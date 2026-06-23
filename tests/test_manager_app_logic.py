@@ -65,3 +65,12 @@ def test_on_event_error_shows_message():
     app._show_error = lambda message: errors.append(message)
     assert app._on_event({"type": "error", "code": "bad_request", "message": "bad input"}) is False
     assert errors == ["bad input"]
+
+
+def test_show_error_logs(caplog):
+    import logging
+    app = _app()
+    app._win = None
+    with caplog.at_level(logging.ERROR, logger="manager.app"):
+        app._show_error("boom-msg")
+    assert any("boom-msg" in r.getMessage() for r in caplog.records)

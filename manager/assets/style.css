@@ -1,0 +1,190 @@
+/* 小组件管理器 — Soft Admin Blue 主题
+ * 源:prototype/小组件管理器.html (:root tokens)。规格:docs/design-specs/2026-06-23-widget-manager-ui.md
+ * 注:GTK3 CSS 不支持 --var/flexbox;颜色用 @define-color,布局靠 GTK Box,字面值在注释标 token 名。 */
+
+/* ---- 颜色 token ---- */
+@define-color bg_app            #EEF3F9;
+@define-color bg_window         #F8FAFD;
+@define-color bg_panel          #FFFFFF;
+@define-color bg_panel_subtle   #F6F8FC;
+@define-color bg_sidebar        #F7F9FD;
+@define-color border_default    #E3E8F0;
+@define-color border_subtle     #EDF1F6;
+@define-color border_strong     #D6DEE9;
+@define-color border_focus      #8BB8FF;
+@define-color text_primary      #111827;
+@define-color text_secondary    #4B5563;
+@define-color text_muted        #7B8794;
+@define-color text_disabled     #AAB4C2;
+@define-color brand_primary     #2563EB;
+@define-color brand_primary_hover  #1D4ED8;
+@define-color brand_primary_soft   #EAF2FF;
+@define-color brand_primary_subtle #F3F7FF;
+@define-color brand_primary_border #BBD4FF;
+@define-color success_primary   #16A34A;
+@define-color success_soft      #EAF8EF;
+@define-color success_subtle    #F3FBF6;
+@define-color success_border    #BFE8CD;
+@define-color success_text      #15803D;
+@define-color danger_primary    #EF4444;
+@define-color danger_hover      #DC2626;
+@define-color danger_soft       #FEF2F2;
+@define-color danger_subtle     #FFF7F7;
+@define-color danger_border     #FECACA;
+@define-color danger_text       #DC2626;
+@define-color warning_primary   #F59E0B;
+@define-color warning_soft      #FFF7E6;
+@define-color warning_border    #FCD48B;
+@define-color warning_text      #B45309;
+@define-color info_primary      #3B82F6;
+@define-color info_soft         #EFF6FF;
+@define-color info_border       #BFDBFE;
+@define-color info_text         #1D4ED8;
+@define-color neutral_100       #F3F4F6;   /* 推断:Tailwind 灰阶 */
+@define-color neutral_200       #E5E7EB;
+@define-color neutral_300       #D1D5DB;
+@define-color neutral_400       #9CA3AF;
+
+/* ---- 全局基底 ---- */
+.mw-root            { background-color: @bg_window; }
+.mw-root,
+.mw-root label,
+.mw-root button     { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif; letter-spacing: 0; }
+.mw-mono            { font-family: "JetBrains Mono", monospace; }
+
+/* 原型字体栈:HTML 用 Inter / JetBrains Mono;中文由浏览器 fallback。
+ * GTK 中显式固定中文 fallback,避免 Pango 与 Chrome 选字不同导致漂移。 */
+
+/* ---- 侧栏 ---- */
+.mw-sidebar         { background-color: @bg_sidebar; border-right: 1px solid @border_default; }
+.mw-brand-logo      { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      background-color: @brand_primary; color: #FFFFFF; font-weight: 700;
+                      border-radius: 8px; font-size: 15px; }
+.mw-brand-name      { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_primary; font-weight: 700; font-size: 14px; }
+.mw-brand-sub       { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_muted; font-size: 11px; font-weight: 400; }
+
+.mw-nav-btn         { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      padding: 9px 12px; border-radius: 8px; border: none;
+                      font-size: 13px; font-weight: 600; color: @text_secondary;
+                      background-color: transparent; background-image: none;
+                      box-shadow: none; outline: none;
+                      transition: background-color .15s ease, color .15s ease; }
+.mw-nav-btn:hover   { background-color: @bg_panel_subtle; }
+.mw-nav-btn.selected,
+.mw-nav-btn.selected:hover { background-color: @brand_primary_soft; color: @brand_primary; }
+.mw-nav-btn label   { color: inherit; }
+
+.mw-nav-count       { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @brand_primary; background-color: #FFFFFF;
+                      border: 1px solid @brand_primary_border; border-radius: 999px;
+                      font-size: 10px; font-weight: 700; padding: 1px 6px; }
+.mw-nav-soon        { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_muted; font-size: 10px; font-weight: 600; }
+.mw-sidebar-status  { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_secondary; font-size: 12px; font-weight: 400; }
+.mw-sidebar-foot    { border-top: 1px solid @border_default; }
+
+/* ---- 顶栏 ---- */
+.mw-topbar          { background-color: @bg_window; border-bottom: 1px solid @border_default; }
+.mw-page-title      { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_primary; font-weight: 700; font-size: 18px; }
+.mw-page-sub        { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_muted; font-size: 12px; font-weight: 400; }
+.mw-conn-chip       { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600;
+                      border: 1px solid @border_default; background-color: @neutral_100; color: @text_muted; }
+.mw-conn-chip.is-connected     { background-color: @success_soft; color: @success_text; border-color: @success_border; }
+.mw-conn-chip.is-reconnecting  { background-color: @warning_soft; color: @warning_text; border-color: @warning_border; }
+.mw-conn-chip.is-disconnected  { background-color: @neutral_100; color: @text_muted; border-color: @border_default; }
+
+/* ---- 卡片 / 区块 ---- */
+.mw-content         { background-color: @bg_window; }
+.mw-card            { background-color: @bg_panel; border: 1px solid @border_default;
+                      border-radius: 10px; box-shadow: 0 6px 18px rgba(15,23,42,0.06); }
+.mw-section         { background-color: @bg_panel; border: 1px solid @border_default;
+                      border-radius: 10px; box-shadow: 0 6px 18px rgba(15,23,42,0.06); }
+.mw-section.is-dim  { opacity: 0.62; }
+.mw-row-divider     { border-bottom: 1px solid @border_subtle; }
+
+/* metric 卡 */
+.mw-metric-card     { padding: 16px; }   /* 内边距走 CSS;高度随内容自然撑开,贴合原型紧凑卡 */
+.mw-metric-label    { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_muted; font-size: 12px; font-weight: 400; }
+.mw-metric-value    { font-family: "JetBrains Mono", monospace; font-size: 22px; font-weight: 700; color: @brand_primary; }
+.mw-metric-value.is-off { color: @text_disabled; }
+.mw-metric-foot     { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: @text_muted; font-size: 11px; font-weight: 400; }
+
+/* 文字层级 */
+.mw-h-15-700        { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      font-size: 15px; font-weight: 700; color: @text_primary; }
+.mw-h-14-600        { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      font-size: 14px; font-weight: 600; color: @text_primary; }
+.mw-h-13-600        { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      font-size: 13px; font-weight: 600; color: @text_primary; }
+.mw-sub-12          { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      font-size: 12px; font-weight: 400; color: @text_muted; }
+.mw-sub-13          { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      font-size: 13px; font-weight: 400; color: @text_secondary; }
+.mw-key-mono        { font-family: "JetBrains Mono", "Source Han Sans SC", monospace; font-size: 11px; color: @text_muted; }
+.mw-val-mono        { font-family: "JetBrains Mono", "Source Han Sans SC", monospace; font-size: 18px; font-weight: 700; color: @text_primary; }
+.mw-iv-mono         { font-family: "JetBrains Mono", "Source Han Sans SC", monospace; font-size: 13px; font-weight: 600; color: @text_primary; }
+.mw-cap-11          { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      font-size: 11px; font-weight: 400; color: @text_muted; }
+
+/* 按钮 */
+.mw-btn-primary     { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: #FFFFFF; background-image: none; background-color: @brand_primary;
+                      border: none; border-radius: 6px; font-weight: 600; font-size: 14px;
+                      padding: 0 20px; box-shadow: 0 4px 10px rgba(37,99,235,0.22); }
+.mw-btn-primary:hover { background-color: @brand_primary_hover; }
+.mw-btn-danger      { font-family: "Inter", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+                      color: #FFFFFF; background-image: none; background-color: @danger_primary;
+                      border: none; border-radius: 6px; font-weight: 600; font-size: 14px;
+                      padding: 0 20px; box-shadow: 0 4px 10px rgba(239,68,68,0.22); }
+.mw-btn-danger:hover { background-color: @danger_hover; }
+.mw-step-btn        { min-width: 24px; min-height: 24px; padding: 0; border-radius: 4px;
+                      border: 1px solid @border_strong; background-image: none; background-color: @bg_panel;
+                      color: @text_secondary; font-size: 15px; box-shadow: none; }
+.mw-step-btn:hover  { background-color: @bg_panel_subtle; }
+
+/* 徽章 */
+.mw-badge           { border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; }
+.mw-badge.is-running  { background-color: @success_soft; color: @success_text; border: 1px solid @success_border; }
+.mw-badge.is-disabled { background-color: @neutral_100; color: @text_muted; border: 1px solid @border_default; }
+.mw-badge.is-error    { background-color: @danger_soft; color: @danger_text; border: 1px solid @danger_border; }
+
+/* 横幅 */
+.mw-banner          { border-radius: 10px; border: 1px solid @border_default; padding: 18px 20px; }
+.mw-banner.is-success { background-color: @success_subtle; border-color: @success_border; }
+.mw-banner.is-warning { background-color: @warning_soft;   border-color: @warning_border; }
+.mw-banner.is-neutral { background-color: @neutral_100;    border-color: @border_default; }
+.mw-banner.is-danger  { background-color: @danger_soft;    border-color: @danger_border; }
+.mw-banner-title    { font-size: 16px; font-weight: 700; color: @text_primary; }
+.mw-banner-title.is-success { color: @success_text; }
+.mw-banner-desc     { font-size: 13px; color: @text_secondary; }
+.mw-icon-tile       { border-radius: 10px; color: @brand_primary; background-color: @brand_primary_soft; }
+.mw-icon-tile image { -gtk-icon-shadow: none; }
+.mw-icon-tile.is-brand   { color: @brand_primary; background-color: @brand_primary_soft; }
+.mw-icon-tile.is-success { color: @success_primary; background-color: @success_soft; }
+.mw-icon-tile.is-warning { color: @warning_primary; background-color: @warning_soft; }
+.mw-icon-tile.is-neutral { color: @neutral_400; background-color: @neutral_100; }
+.mw-icon-tile.is-brand image   { color: @brand_primary; }
+.mw-icon-tile.is-success image { color: @success_primary; }
+.mw-icon-tile.is-warning image { color: @warning_primary; }
+.mw-icon-tile.is-neutral image { color: @neutral_400; }
+
+/* 告警条 */
+.mw-alert           { background-color: @warning_soft; border: 1px solid @warning_border; border-radius: 8px; }
+.mw-alert-title     { font-size: 13px; font-weight: 600; color: @warning_text; }
+.mw-alert-desc      { font-size: 12px; color: @text_secondary; }
+.mw-iconbtn         { border: none; background-color: transparent; background-image: none; box-shadow: none; padding: 2px; }
+
+/* 小组件预览卡 */
+.mw-preview-card    { background-color: @bg_panel_subtle; border: 1px dashed @border_strong; border-radius: 10px; }
+.mw-empty-card      { padding: 36px 24px 28px; }
+.mw-soon-corner     { color: @text_muted; font-size: 10px; font-weight: 600; }
+.mw-chip            { background-color: @bg_panel_subtle; border: 1px solid @border_default;
+                      border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: @text_secondary; }

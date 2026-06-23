@@ -171,3 +171,14 @@ def test_stop_core_sigterm_when_disconnected(monkeypatch):
     monkeypatch.setattr(sup_mod.os, "kill", lambda pid, sig: killed.append((pid, sig)))
     sup.stop_core()
     assert killed == [(4321, sup_mod.signal.SIGTERM)]   # 未连 → 按 pid 发 SIGTERM
+
+
+def test_start_core_logs_on_popen_failure(monkeypatch, caplog):
+    import logging
+    import manager.supervisor as sup_mod
+    sup = _sup()
+    monkeypatch.setattr(sup_mod.subprocess, "Popen",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("boom")))
+    with caplog.at_level(logging.ERROR, logger="manager.supervisor"):
+        sup.start_core()
+    assert any(r.levelno == logging.ERROR for r in caplog.records)
