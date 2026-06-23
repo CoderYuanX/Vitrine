@@ -1,6 +1,7 @@
 import json
 import time
 
+import pytest
 from websockets.sync.client import connect
 
 from core.config import Config
@@ -9,6 +10,13 @@ from core.providers.base import Provider
 from core.providers.system import SystemProvider
 from core.providers.time import TimeProvider
 from core.server import start_in_thread
+
+
+def test_start_in_thread_raises_when_unbindable():
+    # 不可绑定的地址(RFC5737 TEST-NET-1,本机没有该 IP)→ 首选端口与端口 0 两次 bind 都失败。
+    # start_in_thread 必须把异常抛回调用方,而非空等 5s 后返回 port=None。
+    with pytest.raises(OSError):
+        start_in_thread(_hub(), "192.0.2.1", 0)
 
 
 def _hub():
