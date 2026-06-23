@@ -1731,7 +1731,8 @@ git commit -m "feat(core): 底座入口 实例锁/runtime/优雅停止/配置持
   - `manager/ws_client.py`:`class CoreClient`
     - `__init__(self, host, port, token, on_event, on_state)`:`on_event(dict)`/`on_state(str)` 由调用方负责切回 GTK 主线程
     - `start()`:起后台线程跑 asyncio loop,连后先发 `hello`+token,再回放调用方设定的订阅;断线指数退避重连(0.5→1→2→…→最多 10s),**退避用可唤醒的 `asyncio.Event` 等待而非裸 `sleep`,以便 `stop()` 立即打断**
-    - `subscribe(topics: list[str])`、`send(msg: dict, on_reply=None)`:线程安全;**消息入待发队列,未连上/重连中不丢,连上(hello ok)后统一 flush**;`subscribe` 另记入 `self._subs` 供每次重连后重订阅
+    - `send(msg: dict, on_reply=None)`:线程安全;**消息入待发队列,未连上/重连中不丢,连上(hello ok)后统一 flush**
+    - `subscribe(topics: list[str])`:更新 `self._subs`(订阅事实来源);**已连则立即补订新 topic,未连则由连接成功路径按 `_subs` 统一发一次**(避免重复 subscribe);每次(重)连都按 `_subs` 重订阅
     - `is_connected() -> bool`:是否已鉴权连上(供面板"停止底座"决定走 WS shutdown 还是 SIGTERM 兜底)
     - `stop()`:置 `_stop`、`call_soon_threadsafe` **唤醒退避 `_wake` 并关连接**、`join` 线程(不留悬挂 daemon,即便正处于重连退避)
     - 回包关联:带 `id` 的请求,其 `ok`/`error` 响应据 `id` 回调 `on_reply`
@@ -1929,8 +1930,10 @@ class CoreClient:
         self._thread.start()
 
     def subscribe(self, topics):
-        self._subs.update(topics)                         # 记下以便每次(重)连后重订阅
-        self.send({"action": "subscribe", "topics": list(topics)})
+        self._subs.update(topics)                         # _subs 是订阅的事实来源
+        if self._connected:                               # 已连:立即补订新 topic
+            self.send({"action": "subscribe", "topics": list(topics)})
+        # 未连:连接成功时由 _main 统一按 _subs 发送一次,避免重复 subscribe
 
     def send(self, msg, on_reply=None):
         # 入队而非直发:未连上/重连中也不丢,连上(hello ok)后统一 flush
