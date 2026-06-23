@@ -78,38 +78,92 @@
 - `system` 用 `psutil`(纯内核接口,跨发行版一致)。
 - `time` 用标准库。
 
-### 3.3 WebSocket 协议(pub/sub)
+### 3.3 WebSocket 协议(pub/sub + request/response)
 
-监听 `ws://127.0.0.1:PORT`(端口默认值写在配置,默认 `35355`,占用则顺延)。
+**绑定与权限(最小权限原则)**:
+- 仅监听 `127.0.0.1`,**绝不绑定 `0.0.0.0` 或任何远程地址**;拒绝非环回来源的连接。
+- 控制接口只面向本机当前用户;第一版不做认证(本机同用户进程默认可信)。
+- 已知边界:本机任意进程都能连上并下发控制消息。第一版接受该风险;待开放第三方 widget / 插件时,再引入 token 或改用带文件权限的 Unix domain socket(协议形态保持兼容)。
+
+端口:默认 `35355`,占用则顺延;实际端口通过 runtime 状态文件对外公布(见 3.4),不靠面板猜。
+
+**请求带可选 `id`,底座回 `ok`/`error` 响应(便于面板确认成功/失败、便于测试):**
 
 客户端 → 底座:
 ```json
-{ "action": "subscribe",   "topics": ["system.cpu", "time.now"] }
-{ "action": "unsubscribe", "topics": ["system.cpu"] }
-{ "action": "list_providers" }
+{ "id": "req-1", "action": "subscribe",   "topics": ["system.cpu", "time.now"] }
+{ "id": "req-2", "action": "unsubscribe", "topics": ["system.cpu"] }
+{ "id": "req-3", "action": "list_providers" }
+{ "id": "req-4", "action": "set_provider", "provider": "system", "enabled": false }
+{ "id": "req-5", "action": "set_interval", "topic": "system.cpu", "interval": 2 }
 ```
 
 底座 → 客户端:
 ```json
-{ "type": "data",      "topic": "system.cpu", "data": { "percent": 37.2 }, "ts": 1750000000.0 }
-{ "type": "providers", "providers": [ { "id": "system", "enabled": true, "interval": 1, "topics": [..], "status": "running" }, .. ] }
-{ "type": "error",     "message": "unknown topic: foo" }
+// 数据推送(无 id,主动广播)
+{ "type": "data",  "topic": "system.cpu", "data": { "percent": 37.2 }, "ts": 1750000000.0 }
+// 状态快照(主动广播 + 可由 list_providers 触发,带回请求 id)
+{ "type": "status", "id": "req-3", "status": { /* 见 3.5 状态模型 */ } }
+// 控制成功
+{ "type": "ok",    "id": "req-5" }
+// 控制/请求失败,带机器可读 code
+{ "type": "error", "id": "req-5", "code": "invalid_interval", "message": "interval must be in [0.5, 3600]" }
 ```
 
-控制类(供面板改配置/启停 provider):
+错误 `code` 枚举(第一版):`unknown_topic`、`unknown_provider`、`invalid_interval`、`bad_request`(JSON 解析失败 / 缺字段)。
+
+**interval 边界与生效语义**:
+- 取值范围 **[0.5, 3600] 秒**;非数字、负数、越界一律返回 `invalid_interval`,不改动现状。
+- `set_interval` 成功后:**立即 `poll(topic)` 推一次,并以新周期重置该 topic 的定时器**(不必等旧周期走完)。
+- `set_provider` / `set_interval` 处理成功后,除回 `ok` 外,再向所有客户端广播一条最新 `status`。
+
+### 3.4 端口发现与实例发现(runtime 状态)
+
+为避免"面板读到旧端口""多个底座互相踩配置",**端口/实例状态走独立的 runtime 文件,与可编辑配置分离**:
+
+- 路径:`~/.local/state/managewidgets/core.json`(XDG state 目录)。
+- 内容:`{ "pid": 12345, "port": 35355, "started_at": 1750000000.0, "version": "0.1.0" }`。
+- 底座启动流程:
+  1. 读 `core.json`,若存在且 `pid` 仍存活(`os.kill(pid, 0)` / 检查 `/proc/<pid>`)→ 判定已有实例在跑,**不再启动第二个**,直接退出并打印已有端口。
+  2. 否则(无文件 / pid 已死)→ 绑定端口(默认 35355,占用顺延),成功后**原子写入** `core.json`(写临时文件再 `rename`)。
+  3. 正常退出时删除 `core.json`;异常退出残留的陈旧文件由下次启动的 pid 存活检查识别并覆盖。
+- 面板发现底座流程:**优先读 `core.json` 拿 pid+port**;读不到再退回 `config.toml` 里的默认端口尝试连接;都失败则视为底座未运行,提示一键启动。
+
+### 3.5 状态模型(provider / topic)
+
+`status` 快照结构明确分层,面板直接渲染,**不从 `data` 推送里反推**:
+
 ```json
-{ "action": "set_provider", "id": "system", "enabled": false }
-{ "action": "set_interval", "id": "system", "topic": "system.cpu", "interval": 2 }
+{
+  "core": { "port": 35355, "uptime": 137.0, "clients": 2, "version": "0.1.0" },
+  "providers": [
+    {
+      "id": "system",
+      "enabled": true,
+      "status": "running",            // running | error | disabled
+      "topics": [
+        { "topic": "system.cpu", "interval": 1.0, "last_value": {"percent":37.2},
+          "last_ts": 1750000000.0, "last_error": null },
+        { "topic": "system.mem", "interval": 2.0, "last_value": {"percent":61.0},
+          "last_ts": 1750000000.0, "last_error": null }
+      ]
+    }
+  ]
+}
 ```
-底座处理后广播一条新的 `providers` 状态。
 
-### 3.4 配置存储
+- **provider 级**:`enabled`、`status`。`status: error` 表示采集异常(`last_error` 记在出错的 topic 上)。
+- **topic 级**:`interval`、`last_value`、`last_ts`、`last_error`。
+- **第一版无独立的 topic 级 enabled**:一个 topic 是否活跃 = 其 provider 的 `enabled`(与 §4.2 的 provider 级开关一致)。`set_topic` 留作后续扩展。
+- **客户端数 `clients`** 放在 `core` 整体下,不放进 provider。
 
-- 路径:`~/.config/managewidgets/config.toml`
-- 内容:WebSocket 端口、各 provider 的 `enabled` 与 `interval` 覆盖、自启状态。
+### 3.6 配置存储
+
+- 路径:`~/.config/managewidgets/config.toml`(可编辑、可持久)。
+- 内容:WebSocket 默认端口、各 provider 的 `enabled`、各 topic 的 `interval` 覆盖、自启状态。**不含运行时端口/pid**(那是 runtime 文件的职责,见 3.4)。
 - 启动时读取,运行中被面板改动后写回。
 
-### 3.5 进程与自启
+### 3.7 进程与自启
 
 - 底座是独立可执行入口(如 `managewidgets-core`),可由面板拉起,也可手动/自启运行。
 - 自启:在 `~/.config/autostart/` 写入 `.desktop` 文件(XDG 标准,跨桌面通用),由面板开关控制。
@@ -126,38 +180,50 @@ GTK + PyGObject 应用。一个主窗口,左侧导航或顶部页签切换三页
 
 ### 4.2 数据源页(主角)
 
-- 列出所有 provider 产出的 topic,每行:
+**按 provider 分组显示**,启停与间隔的语义因此清晰、不互相误伤:
+
+- 每个 provider 一个分组,**组标题上放 provider 级启用/停用开关**(下发 `set_provider`)。停用即该 provider 所有 topic 一起停。
+- 组内每个 topic 一行,只负责该 topic 自己的展示与间隔:
   - 名称(如 "CPU 占用")
   - **实时当前值**(面板自身订阅该 topic,持续刷新显示)
-  - 刷新间隔(可编辑,改动通过 `set_interval` 下发)
-  - 启用/停用开关(通过 `set_provider` 下发)
-  - 设置入口(本版 system/time 无额外设置,留位)
-- 面板与底座断连时显示"未连接",并提供重连。
+  - 刷新间隔(可编辑,下发 `set_interval`;越界则面板提示底座返回的 `invalid_interval`)
+  - (设置入口:本版 system/time 无额外设置,留位)
+- **不在 topic 行放 provider 开关**——避免"在 CPU 行关开关却把内存也停了"的语义歧义。
+- 面板与底座断连时整页显示"未连接",并提供重连。
 
 ### 4.3 小组件页(占位)
 
 - 空状态:说明"小组件渲染功能开发中",列出后续能力(贴桌面、Web 小组件、订阅底座数据)。
 - 不实现任何渲染/列表逻辑。
 
-### 4.4 面板 ↔ 底座连接
+### 4.4 面板 ↔ 底座连接(GTK / asyncio 边界,实现方案定死)
 
-- 面板启动时尝试连接 `ws://127.0.0.1:PORT`;连不上则提示底座未运行,可在概览页一键启动。
-- 面板用一个后台 WebSocket 客户端线程/异步循环接收推送,经 GLib 主循环安全地更新 UI。
+为避免实现时在 GTK 主循环和 asyncio 之间摇摆,**这一版固定如下方案**:
+
+- 端口来自 §3.4 的发现流程(先 runtime `core.json`,再退回配置默认端口)。连不上则提示底座未运行,可在概览页一键启动。
+- `manager/ws_client.py` **在一个独立线程内运行自己的 asyncio event loop**,该线程负责所有 WebSocket 收发与自动重连(带指数退避)。
+- **所有 UI 更新一律通过 `GLib.idle_add(...)` 回到 GTK 主线程执行**;WS 线程绝不直接碰 GTK 控件。
+- 面板向底座发请求时,WS 线程按 `id` 关联 `ok`/`error` 响应,再用 `GLib.idle_add` 把结果回灌给 UI(保存成功/失败提示)。
+- 主窗口关闭时**显式停止 asyncio loop、关闭 WS 连接、join 线程**,不留悬挂线程。
 
 ## 5. 错误处理
 
 - **底座未运行**:面板显式提示,提供"启动底座"。不静默卡死。
-- **端口被占用**:底座顺延端口并写回配置;面板从配置读端口。
-- **provider 采集异常**(如 psutil 偶发报错):该 provider 标记 `status: error` 并广播,面板显示错误态,不影响其他 provider 与底座主循环。
-- **WS 客户端异常断开**:底座清理其订阅;面板侧自动重连(带退避)。
-- **配置文件损坏**:底座回退到默认配置并记录日志,不崩溃。
+- **端口被占用**:底座顺延端口,实际端口写入 runtime `core.json`(§3.4);面板从 runtime 文件读端口,因此不会读到旧端口。
+- **多实例**:底座启动时检查 `core.json` 的 pid 是否存活,已有存活实例则拒绝启动第二个(§3.4)。
+- **provider 采集异常**(如 psutil 偶发报错):对应 topic 写入 `last_error`、provider 标记 `status: error` 并广播 `status`,面板显示错误态;不影响其他 provider 与底座主循环。
+- **WS 客户端异常断开**:底座清理其订阅、`clients` 计数减一;面板侧自动重连(指数退避)。
+- **坏请求**:JSON 解析失败 / 缺字段 → 回 `error` + `bad_request`,连接不断。
+- **配置文件损坏**:底座**把损坏文件重命名为 `config.toml.bak.YYYYMMDDHHMMSS`,生成全新默认配置并记录日志**;面板侧在状态里感知到"配置已重置"并提示用户。绝不静默覆盖用户配置。
 
 ## 6. 测试策略
 
-- **Provider 单元测试**:`system`/`time` 的 `poll()` 返回结构正确(psutil 可 mock)。
-- **协议单元测试**:订阅/退订/控制消息的处理逻辑;未知 topic / 坏消息返回 `error`。
-- **底座集成测试**:起一个底座实例,用测试 WS 客户端订阅,断言能收到 `data` 推送,改 interval 生效,停 provider 后不再推送。
-- **面板**:连接逻辑与重连退避可单元测;GUI 渲染做冒烟(能起、能连、能显示一次数据)。
+- **Provider 单元测试**:`system`/`time` 的 `poll(topic)` 返回结构正确(psutil 可 mock)。
+- **协议单元测试**:订阅/退订/控制消息处理;请求 `id` 正确回传;未知 topic→`unknown_topic`、坏消息→`bad_request`、越界间隔→`invalid_interval`;`set_interval` 后立即重推一次并重置周期。
+- **底座集成测试**:起一个底座实例,用测试 WS 客户端订阅,断言收到 `data` 推送、改 interval 推送频率随之变化、停 provider 后该组 topic 停推而其他 provider 不受影响。
+- **端口/多实例测试**:端口被占用时底座顺延并把实际端口写入 `core.json`,测试客户端按该文件能连上;已有存活底座时再次启动直接退出、不起第二个实例(pid 存活检查可 mock)。
+- **配置健壮性测试**:`config.toml` 内容损坏时,底座把它备份为 `config.toml.bak.<ts>`、生成默认配置、正常启动,且状态里标记"已重置"。
+- **面板**:WS 客户端连接/重连退避、`id`↔响应关联可单元测;runtime 端口发现优先于配置端口;GUI 渲染做冒烟(能起、能连、能显示一次数据)。
 - 遵循 TDD:每个单元先写失败测试再实现。
 
 ## 7. 仓库结构(建议)
@@ -166,14 +232,15 @@ GTK + PyGObject 应用。一个主窗口,左侧导航或顶部页签切换三页
 managewidgets/
   core/                     # 底座
     __init__.py
-    server.py               # WebSocket pub/sub 服务 + 调度循环
+    server.py               # WebSocket pub/sub 服务 + 调度循环 + 请求/响应
+    state.py                # runtime 文件读写(core.json)+ pid 存活检查
+    config.py               # 配置读写 + 损坏备份回退
     providers/
       __init__.py
-      base.py               # Provider 接口
+      base.py               # Provider 接口(topics / poll(topic) / interval)
       system.py             # CPU/内存
       time.py               # 时间
-    config.py               # 配置读写
-    __main__.py             # managewidgets-core 入口
+    __main__.py             # managewidgets-core 入口(实例发现 → 绑定 → 写 runtime)
   manager/                  # 管理面板
     __init__.py
     app.py                  # GTK 应用入口
@@ -186,6 +253,8 @@ managewidgets/
     test_providers.py
     test_protocol.py
     test_core_integration.py
+    test_state_discovery.py   # 端口顺延 / runtime 文件 / 多实例
+    test_config.py            # 损坏备份回退
     test_ws_client.py
   pyproject.toml
   docs/superpowers/specs/2026-06-23-widget-manager-platform-design.md
@@ -203,4 +272,18 @@ managewidgets/
 
 ## 9. 验收(本版 Definition of Done)
 
-启动底座 → 打开管理面板 → 数据源页中 CPU/内存/时间实时跳动 → 修改某项刷新间隔立即生效 → 停用某 provider 后其值停止更新 → 重启面板能自动重连。这证明"底座 + 管理器"地基可用,且数据契约已被真实消费者验证。
+逐项可验证清单:
+
+- [ ] `managewidgets-core` 可启动,监听 `127.0.0.1` 上的端口,并写出 `core.json`(pid/port/started_at/version)。
+- [ ] `managewidgets-manager` 可启动,显示概览 / 数据源 / 小组件(占位)三页。
+- [ ] 数据源页中 `system.cpu` / `system.mem` / `time.now` 实时刷新。
+- [ ] 修改 `system.cpu` 的 interval 后,推送频率随之变化(可观测),且面板收到 `ok` 提示保存成功。
+- [ ] 停用 `system` provider 后,CPU/内存停止推送,`time.now` 不受影响。
+- [ ] 面板关闭重开后,能通过 runtime 文件自动连接到已运行的底座。
+- [ ] 底座未运行时,面板可在概览页一键启动底座。
+- [ ] 端口被占用时,底座顺延端口并写入 `core.json`,面板据此仍能连上(不读到旧端口)。
+- [ ] 已有底座在跑时,再次启动底座不会起第二个实例。
+- [ ] `config.toml` 损坏时,底座备份为 `config.toml.bak.<ts>` 并以默认配置正常启动,面板提示"配置已重置"。
+- [ ] 越界 interval 被拒(`invalid_interval`),坏请求返回 `bad_request`,连接不断。
+
+达成即证明"底座 + 管理器"地基可用,且数据契约已被真实消费者(面板)端到端验证。
