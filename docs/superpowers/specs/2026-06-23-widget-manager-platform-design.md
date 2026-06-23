@@ -20,6 +20,7 @@
 |---|---|
 | 运行平台 | **X11 优先**(覆盖当前 Deepin 25 及 KDE/GNOME-X11/XFCE/MATE/Cinnamon);Wayland 架构预留,后续单独加宿主后端 |
 | 渲染方式 | 后续版本用无边框 keep-below 桌面层窗口(Conky 式);本版不涉及 |
+| 小组件渲染载体 | **WebView 承载(WebKitGTK),不是 GTK 原生控件渲染小组件**。小组件 UI 全部是 HTML/CSS/JS,GTK 只负责那个无边框窗口的外壳。这是为了支持**动效**——CSS 动画/过渡、JS、Canvas 2D、SVG 都是支持目标;WebGL 视 WebKitGTK 启用情况为尽力支持。本版不涉及,但路线图与宿主选型据此锁定,避免误选纯 GTK 渲染 |
 | 小组件形式 | Web(HTML/CSS/JS),后续版本;本版不涉及 |
 | 技术栈 | **Python**;GUI 用 **GTK + PyGObject(gi)**;数据供给用 **WebSocket** |
 | 第一版范围 | **底座 + 管理面板**(面板实时显示底座数据,小组件页占位) |
@@ -130,7 +131,8 @@
 为避免"面板读到旧端口""多个底座互相踩配置",**端口/实例状态走独立的 runtime 文件,与可编辑配置分离**:
 
 - 路径:`~/.local/state/managewidgets/core.json`(XDG state 目录,文件权限 `0600`)。
-- 内容:`{ "pid": 12345, "port": 35355, "token": "<随机>", "started_at": 1750000000.0, "version": "0.1.0" }`。
+- 内容:`{ "pid": 12345, "port": 35355, "token": "<256-bit 随机>", "started_at": 1750000000.0, "version": "0.1.0" }`。
+- **token 强度**:用 `secrets.token_urlsafe(32)`(即 256-bit 密码学随机,约 43 个 url-safe 字符)。**禁止**用时间戳、PID、`random` 模块或短随机数。每次底座启动重新生成。
 - **实例锁用 `flock`,不靠裸 PID 判断**(避免 PID 复用误判):
   - 锁文件 `~/.local/state/managewidgets/core.lock`,底座启动时对它 `flock(LOCK_EX | LOCK_NB)`。
   - **拿到锁** → 没有其他实例(进程死亡时内核自动释放锁,天然防 PID 复用)→ 继续启动。
@@ -248,7 +250,7 @@ GTK + PyGObject 应用。一个主窗口,左侧导航或顶部页签切换三页
 
 - **Provider 单元测试**:`system`/`time` 的 `poll(topic)` 返回结构正确(psutil 可 mock)。
 - **协议单元测试**:订阅/退订/控制消息处理;请求 `id` 正确回传;未知 topic→`unknown_topic`、坏消息→`bad_request`、越界间隔→`invalid_interval`;`set_interval` 后立即重推一次并重置周期。
-- **鉴权测试**:不发 `hello` 或 token 错→`unauthorized` 并断开;正确 token→放行;`shutdown` 触发优雅退出(清 `core.json`、释放锁)。
+- **鉴权测试**:不发 `hello` 或 token 错→`unauthorized` 并断开;正确 token→放行;`shutdown` 触发优雅退出(清 `core.json`、释放锁)。token 满足长度/格式下限(≥43 个 url-safe 字符、非时间戳/PID/弱随机)。
 - **底座集成测试**:起一个底座实例,用测试 WS 客户端订阅,断言收到 `data` 推送、改 interval 推送频率随之变化、停 provider 后该组 topic 停推而其他 provider 不受影响。
 - **端口/多实例测试**:端口被占用时底座顺延并把实际端口写入 `core.json`,测试客户端按该文件能连上;已持锁底座存在时再次启动因 `flock` 失败而直接退出、不起第二个实例;**拿到锁后残留 `core.json` 被覆盖而非被信任**;`core.json` 落盘后权限为 `0600`(非 group/world 可读)。
 - **停止安全测试**:`SIGTERM` 兜底前的防误杀校验——pid 复用为无关进程(cmdline 不匹配)时**不发信号**。
@@ -294,8 +296,8 @@ managewidgets/
 
 ## 8. 后续路线图(本版之后)
 
-1. **小组件宿主(X11)**:无边框 keep-below 桌面层窗口;锁定/编辑两态;位置持久化(显示器 + 相对坐标);可选点击穿透。
-2. **Web 小组件包**:`manifest.json` + `index.html`;注入 `mw.subscribe(topic, cb)` 薄封装;`~/.local/share/managewidgets/widgets/` 扫描即装。
+1. **小组件宿主(X11)**:无边框 keep-below 桌面层窗口;**窗口内嵌 WebKitGTK WebView 渲染小组件,不用 GTK 原生控件画小组件**;锁定/编辑两态;位置持久化(显示器 + 相对坐标);可选点击穿透。透明背景 + 合成器支持,让动效小组件能透出桌面。
+2. **Web 小组件包**:`manifest.json` + `index.html`;UI 用 HTML/CSS/JS,**动效支持目标 = CSS 动画/过渡、JS、Canvas 2D、SVG;WebGL 尽力支持**;注入 `mw.subscribe(topic, cb)` 薄封装;`~/.local/share/managewidgets/widgets/` 扫描即装。
 3. **更多 Provider**:天气(wttr.in 无 key 或 OpenWeatherMap)、MPRIS 媒体、磁盘/网络/温度。
 4. **管理面板补全**:小组件列表 + 开关、设置表单(读 manifest schema 自动生成)、布局编辑。
 5. **Wayland 宿主后端**:wlr-layer-shell(wlroots/KWin);GNOME-Wayland 退化为普通窗口并说明限制。
@@ -305,7 +307,7 @@ managewidgets/
 逐项可验证清单:
 
 - [ ] `managewidgets-core` 可启动,监听 `127.0.0.1` 上的端口,并写出 `core.json`(pid/port/**token**/started_at/version)。
-- [ ] `core.json` 文件权限为 `0600`(属主可读写,**非 group/world 可读**),token 非空。
+- [ ] `core.json` 文件权限为 `0600`(属主可读写,**非 group/world 可读**),token 为 `secrets.token_urlsafe(32)` 量级(≥43 个 url-safe 字符、256-bit 随机)。
 - [ ] `managewidgets-manager` 可启动,显示概览 / 数据源 / 小组件(占位)三页。
 - [ ] 数据源页中 `system.cpu` / `system.mem` / `time.now` 实时刷新。
 - [ ] 修改 `system.cpu` 的 interval 后,推送频率随之变化(可观测),且面板收到 `ok` 提示保存成功。
