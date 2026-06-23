@@ -38,9 +38,9 @@ class CoreClient:
 
     def send(self, msg, on_reply=None):
         # 入队而非直发:未连上/重连中也不丢,连上(hello ok)后统一 flush
-        if on_reply and msg.get("id"):
-            self._pending[msg["id"]] = on_reply
-        with self._outlock:
+        with self._outlock:                               # _pending 与 _outbox 同锁,跨线程一致
+            if on_reply and msg.get("id"):
+                self._pending[msg["id"]] = on_reply
             self._outbox.append(msg)
         if self._loop:
             self._loop.call_soon_threadsafe(lambda: self._loop.create_task(self._flush()))
@@ -58,6 +58,17 @@ class CoreClient:
                     self._outbox[:0] = pending[i:]
                 break
 
+    def _fail_pending(self, code: str) -> None:
+        # 把所有待应答回调以 error 兜底触发并清空(连接拆除/停止时调用):
+        # 在途请求随连接丢失,面板据此回显失败而非永久等待
+        with self._outlock:
+            pending, self._pending = self._pending, {}
+        for cb in pending.values():
+            try:
+                cb({"type": "error", "code": code, "message": "connection lost"})
+            except Exception:
+                pass
+
     def _run(self):
         asyncio.run(self._main())
 
@@ -66,6 +77,7 @@ class CoreClient:
         self._wake = asyncio.Event()
         backoff = 0.5
         while not self._stop:
+            had_session = False                           # 本轮是否真正连上过(决定断连是否要兜底 pending)
             try:
                 async with websockets.connect(f"ws://{self._host}:{self._port}") as ws:
                     self._ws = ws
@@ -79,6 +91,7 @@ class CoreClient:
                         self._on_state("disconnected")
                         return
                     self._connected = True
+                    had_session = True
                     self._on_state("connected")
                     backoff = 0.5
                     if self._subs:                        # 每次(重)连重订阅 + flush 暂存的控制消息
@@ -88,8 +101,11 @@ class CoreClient:
                     async for raw in ws:
                         msg = json.loads(raw)
                         rid = msg.get("id")
-                        if rid in self._pending and msg.get("type") in ("ok", "error"):
-                            cb = self._pending.pop(rid)
+                        cb = None
+                        if rid is not None and msg.get("type") in ("ok", "error"):
+                            with self._outlock:
+                                cb = self._pending.pop(rid, None)
+                        if cb is not None:
                             cb(msg)
                         else:
                             self._on_event(msg)
@@ -98,6 +114,8 @@ class CoreClient:
             finally:
                 self._ws = None
                 self._connected = False
+                if had_session:                           # 连上过又断:在途请求随连接丢失,兜底回调
+                    self._fail_pending("disconnected")
             if self._stop:
                 break
             try:                                          # 可被 stop() 唤醒的退避等待(替代裸 sleep)
@@ -106,6 +124,7 @@ class CoreClient:
                 pass
             self._wake.clear()
             backoff = min(backoff * 2, 10)
+        self._fail_pending("disconnected")                # 退出循环(stop):清掉所有未应答回调,不留悬挂
 
     def stop(self):
         self._stop = True

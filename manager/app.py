@@ -1,6 +1,3 @@
-import os
-import signal
-import subprocess
 import sys
 
 import gi
@@ -8,9 +5,6 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
-from core.config import default_config_path
-from core.state import default_state_dir, pid_is_core, read_runtime
-from manager.discovery import discover
 from manager.pages.datasources import DataSourcesPage
 from manager.pages.overview import OverviewPage
 from manager.pages.widgets_placeholder import WidgetsPlaceholderPage
@@ -20,17 +14,19 @@ from manager.settings import (
     load_close_to_tray,
     save_close_to_tray,
 )
-from manager.ws_client import CoreClient
+from manager.supervisor import CoreSupervisor
 
 
 class ManagerApp(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="org.managewidgets.Manager")
-        self._client = None
         self._win = None
         self._tray = None
         self._held = False
         self._last_port = None
+        # 底座进程/连接的生命周期交给 supervisor;UI 仅通过 on_state/on_event 被通知
+        self._sup = CoreSupervisor(on_state=self._on_state, on_event=self._on_event,
+                                   idle_add=GLib.idle_add, timeout_add=GLib.timeout_add)
 
     # ---- 生命周期 ----
     def do_activate(self):
@@ -44,10 +40,10 @@ class ManagerApp(Gtk.Application):
         self._win = win
         win.set_default_size(560, 460)
         nb = Gtk.Notebook()
-        self._overview = OverviewPage(on_start=self._start_core, on_stop=self._stop_core,
+        self._overview = OverviewPage(on_start=self._sup.start_core, on_stop=self._sup.stop_core,
                                       on_autostart=self._on_overview_autostart)
-        self._datasources = DataSourcesPage(on_set_provider=self._set_provider,
-                                            on_set_interval=self._set_interval)
+        self._datasources = DataSourcesPage(on_set_provider=self._sup.set_provider,
+                                            on_set_interval=self._sup.set_interval)
         nb.append_page(self._overview, Gtk.Label(label="概览"))
         nb.append_page(self._datasources, Gtk.Label(label="数据源"))
         nb.append_page(WidgetsPlaceholderPage(), Gtk.Label(label="小组件"))
@@ -62,8 +58,8 @@ class ManagerApp(Gtk.Application):
             self._held = True
             self._tray.refresh_window_item(True)          # 窗口已 show_all → 菜单初始即「隐藏面板」
 
-        self._connect_client()
-        GLib.timeout_add(2000, self._maybe_autostart_core)  # 宽限期:~2s 未连上则拉核
+        self._sup.connect()
+        GLib.timeout_add(2000, self._sup.maybe_autostart)  # 宽限期:~2s 未连上则拉核
 
     def _build_tray(self):
         try:
@@ -71,8 +67,8 @@ class ManagerApp(Gtk.Application):
             from manager.tray import TrayIndicator
             return TrayIndicator(
                 on_toggle_window=self._toggle_window,
-                on_start_core=self._start_core,
-                on_stop_core=self._stop_core,
+                on_start_core=self._sup.start_core,
+                on_stop_core=self._sup.stop_core,
                 on_set_autostart=self._on_tray_autostart,
                 on_quit=self._quit,
                 autostart_enabled=is_autostart_enabled(),
@@ -154,25 +150,12 @@ class ManagerApp(Gtk.Application):
         if self._held:
             self.release()
             self._held = False
-        if self._client:
-            self._client.stop()
+        self._sup.stop_client()
         if self._win:
             self._win.destroy()
         self.quit()
 
-    # ---- 连接 / 状态 ----
-    def _runtime_path(self):
-        return default_state_dir() / "core.json"
-
-    def _connect_client(self):
-        host, port, token = discover(self._runtime_path(), default_config_path())
-        self._client = CoreClient(host, port, token,
-                                  on_event=lambda m: GLib.idle_add(self._on_event, m),
-                                  on_state=lambda s: GLib.idle_add(self._on_state, s))
-        self._client.start()
-        self._client.subscribe(["system.cpu", "system.mem", "time.now"])
-        self._client.send({"id": "ls", "action": "list_providers"})
-
+    # ---- 状态/事件回调(由 supervisor 触发,已切回主线程)----
     def _on_state(self, state):
         self._overview.set_connection(state)
         if self._tray:
@@ -188,69 +171,23 @@ class ManagerApp(Gtk.Application):
             self._datasources.update(msg["status"])
             if self._tray:
                 self._tray.set_connection("connected", self._last_port)
+        elif msg.get("type") == "error":
+            self._show_error(msg.get("message") or msg.get("code") or "操作失败")
         return False
 
-    # ---- 启停底座 ----
-    def _maybe_autostart_core(self):
-        if not (self._client and self._client.is_connected()):
-            self._start_core()
-        return False
-
-    def _start_core(self):
-        if getattr(self, "_start_polls_active", False):
+    def _show_error(self, message):
+        if self._win is None:
+            print(f"[manager] {message}", file=sys.stderr)
             return
-        self._start_polls_active = True
-        rt = read_runtime(self._runtime_path())
-        self._prev_started_at = rt.get("started_at") if rt else None   # 记旧实例时间戳
-        try:
-            subprocess.Popen([sys.executable, "-m", "core"])
-        except OSError as exc:                            # 拉起失败:回滚防重入标志,否则后续「启动底座」被永久挡住
-            print(f"[manager] 启动底座失败: {exc}", file=sys.stderr)
-            self._start_polls_active = False
-            self._on_state("disconnected")               # 未连上(非鉴权失败),概览/托盘置灰
-            return
-        self._start_polls = 0
-        GLib.timeout_add(500, self._reconnect_when_ready)
+        dlg = Gtk.MessageDialog(transient_for=self._win, modal=True,
+                                message_type=Gtk.MessageType.ERROR,
+                                buttons=Gtk.ButtonsType.OK,
+                                text="操作失败")
+        dlg.format_secondary_text(str(message))
+        dlg.run()
+        dlg.destroy()
 
-    def _reconnect_when_ready(self):
-        # 以"runtime 的 started_at 变成新值"为就绪判定:跳过陈旧 runtime,拿到新 token 再连
-        self._start_polls += 1
-        rt = read_runtime(self._runtime_path())
-        if rt and rt.get("started_at") != self._prev_started_at:
-            self._start_polls_active = False
-            self._reconnect()
-            return False
-        if self._start_polls >= 20:                       # ~10s 仍无新实例 → 放弃
-            self._start_polls_active = False
-            return False
-        return True
-
-    def _reconnect(self):
-        if self._client:
-            self._client.stop()
-        self._connect_client()
-
-    def _stop_core(self):
-        if self._client and self._client.is_connected():
-            self._client.send({"action": "shutdown"})
-            return
-        rt = read_runtime(self._runtime_path())
-        if rt and rt.get("pid") and pid_is_core(rt["pid"]):
-            try:
-                os.kill(rt["pid"], signal.SIGTERM)
-            except OSError:
-                pass
-
-    # ---- provider/interval ----
-    def _set_provider(self, pid, enabled):
-        if self._client:
-            self._client.send({"action": "set_provider", "provider": pid, "enabled": enabled})
-
-    def _set_interval(self, topic, interval):
-        if self._client:
-            self._client.send({"action": "set_interval", "topic": topic, "interval": interval})
-
-    # ---- 自启(改为自启面板 -m manager;概览与托盘联动)----
+    # ---- 自启(自启面板 -m manager;概览与托盘联动)----
     def _set_autostart(self, enabled):
         from core.autostart import disable_autostart, enable_autostart
         if enabled:

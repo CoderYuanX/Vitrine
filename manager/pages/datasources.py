@@ -85,5 +85,13 @@ class DataSourcesPage(Gtk.Box):
                     self.apply_data(t["topic"], t["last_value"])
 
     def apply_data(self, topic, value):
-        if topic in self._rows:
-            self._rows[topic]["value"].set_text(str(value))
+        # 返回是否真的更新:status 心跳会以未变的 last_value 重放,值未变则跳过 set_text
+        r = self._rows.get(topic)
+        if r is None:
+            return False
+        text = str(value)
+        if r.get("last_text") == text:
+            return False
+        r["last_text"] = text
+        r["value"].set_text(text)
+        return True

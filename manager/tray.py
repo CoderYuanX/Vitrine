@@ -73,7 +73,8 @@ class TrayIndicator:
             self._item_status.set_label(text)
             self._ind.set_icon_full(_ICON_CONNECTED, "已连接")
         else:
-            label = {"error": "鉴权失败"}.get(state, "未连接")
+            label = {"error": "鉴权失败",
+                     "start_failed": "启动失败"}.get(state, "未连接")
             self._item_status.set_label(label)
             self._ind.set_icon_full(_ICON_DISCONNECTED, label)
 

@@ -11,24 +11,6 @@ def _app():
     return ManagerApp()                        # 仅构造 Gio.Application,不 run/activate
 
 
-def test_maybe_autostart_core_only_when_disconnected():
-    app = _app()
-    started = []
-    app._start_core = lambda: started.append(1)
-
-    class _Client:
-        def __init__(self, conn): self._c = conn
-        def is_connected(self): return self._c
-
-    app._client = _Client(True)
-    app._maybe_autostart_core()
-    assert started == []                       # 已连接 → 不拉核
-
-    app._client = _Client(False)
-    app._maybe_autostart_core()
-    assert started == [1]                      # 未连接 → 拉核一次
-
-
 def test_set_autostart_uses_manager_exec(monkeypatch):
     import core.autostart as autostart
     captured = []
@@ -66,41 +48,6 @@ def test_close_with_no_tray_quits(monkeypatch):
     assert quit_calls == [1]                   # 无托盘 → 直接退出(不隐藏、不 hold)
 
 
-def test_reconnect_when_ready_waits_for_fresh_runtime(monkeypatch):
-    # 陈旧 runtime(started_at 未变)→ 不重连、继续轮询;新实例(started_at 变了)→ 重连并停轮询
-    import manager.app as appmod
-    app = _app()
-    reconnects = []
-    app._reconnect = lambda: reconnects.append(1)
-    app._prev_started_at = 100.0               # _start_core 记下的旧实例时间戳
-    app._start_polls = 0
-    app._start_polls_active = True
-
-    monkeypatch.setattr(appmod, "read_runtime", lambda p: {"started_at": 100.0})
-    assert app._reconnect_when_ready() is True  # 陈旧 runtime → 继续轮询
-    assert reconnects == []                     # 不误连旧实例
-
-    monkeypatch.setattr(appmod, "read_runtime", lambda p: {"started_at": 200.0})
-    assert app._reconnect_when_ready() is False  # 新 runtime → 停轮询
-    assert reconnects == [1]                     # 以新 token 重连一次
-    assert app._start_polls_active is False
-
-
-def test_reconnect_when_ready_gives_up_after_timeout(monkeypatch):
-    # 一直陈旧 runtime(started_at 未变)→ 轮询到上限(20)后放弃:停轮询且不重连
-    import manager.app as appmod
-    app = _app()
-    reconnects = []
-    app._reconnect = lambda: reconnects.append(1)
-    app._prev_started_at = 100.0
-    app._start_polls = 19                        # 下一次自增到 20 触发超时
-    app._start_polls_active = True
-    monkeypatch.setattr(appmod, "read_runtime", lambda p: {"started_at": 100.0})
-    assert app._reconnect_when_ready() is False  # 到上限 → 停轮询
-    assert reconnects == []                      # 超时不重连
-    assert app._start_polls_active is False
-
-
 def test_minimize_hides_to_tray_only_when_tray_present():
     # 最小化(iconify)行为:有托盘 → 收进托盘(返回 True 表示应 hide,不留 dock 条目);
     # 无托盘(降级)→ 保持系统默认最小化(False),否则窗口最小化即消失且无处唤回。
@@ -112,25 +59,9 @@ def test_minimize_hides_to_tray_only_when_tray_present():
     assert app._minimize_should_hide(True) is False      # 无托盘 → 不接管最小化
 
 
-def test_start_core_rolls_back_guard_on_popen_failure(monkeypatch):
-    # subprocess.Popen 抛 OSError 时:必须回滚 _start_polls_active,否则后续「启动底座」被永久挡住;
-    # 并把状态置为未连接(disconnected),不留下半启动的卡死态。
-    import manager.app as appmod
+def test_on_event_error_shows_message():
     app = _app()
-    states = []
-    app._overview = type("O", (), {"set_connection": lambda self, s: states.append(s)})()
-    app._tray = None
-    app._start_polls_active = False
-    monkeypatch.setattr(appmod.subprocess, "Popen",
-                        lambda *a, **k: (_ for _ in ()).throw(OSError("boom")))
-    app._start_core()
-    assert app._start_polls_active is False       # 防重入标志已回滚
-    assert states == ["disconnected"]             # 概览置灰
-    # 回滚后应能再次尝试启动(不被早返回挡住)
-    again = []
-    monkeypatch.setattr(appmod.subprocess, "Popen",
-                        lambda *a, **k: again.append(1) or type("P", (), {})())
-    monkeypatch.setattr(appmod.GLib, "timeout_add", lambda *a, **k: 0)
-    monkeypatch.setattr(appmod, "read_runtime", lambda p: None)
-    app._start_core()
-    assert again == [1]                           # 第二次真的尝试了
+    errors = []
+    app._show_error = lambda message: errors.append(message)
+    assert app._on_event({"type": "error", "code": "bad_request", "message": "bad input"}) is False
+    assert errors == ["bad input"]

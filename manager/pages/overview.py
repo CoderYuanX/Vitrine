@@ -39,7 +39,8 @@ class OverviewPage(Gtk.Box):
 
     def set_connection(self, state):
         self._conn.set_text({"connected": "已连接", "disconnected": "未连接",
-                             "error": "鉴权失败"}.get(state, state))
+                             "error": "鉴权失败",
+                             "start_failed": "底座启动失败"}.get(state, state))
 
     def update(self, status):
         core = status.get("core", {})

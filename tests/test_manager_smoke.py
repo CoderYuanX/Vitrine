@@ -73,6 +73,20 @@ def test_datasources_syncs_state_without_feedback_loop():
     assert prov_calls == [] and iv_calls == []            # 程序化同步未回环触发控制命令
 
 
+def test_datasources_apply_data_skips_redundant_redraw():
+    # status 心跳每 ~2s 携 last_value 重放,值未变时不应反复 set_text。
+    # apply_data 以返回值表明是否真的更新了(供避免无谓重绘)。
+    from manager.pages.datasources import DataSourcesPage
+    ds = DataSourcesPage(on_set_provider=lambda p, e: None, on_set_interval=lambda t, i: None)
+    ds.update({"providers": [{"id": "system", "enabled": True, "status": "running",
+        "topics": [{"topic": "system.cpu", "interval": 1.0, "last_value": None,
+                    "last_ts": None, "last_error": None}]}]})
+    assert ds.apply_data("system.cpu", {"percent": 5.0}) is True   # 首次 → 更新
+    assert ds.apply_data("system.cpu", {"percent": 5.0}) is False  # 同值 → 跳过
+    assert ds.apply_data("system.cpu", {"percent": 6.0}) is True   # 变化 → 更新
+    assert ds.apply_data("unknown.topic", 1) is False             # 无此行 → 不动作
+
+
 def test_overview_autostart_sync_no_feedback_loop():
     from manager.pages.overview import OverviewPage
     calls = []
