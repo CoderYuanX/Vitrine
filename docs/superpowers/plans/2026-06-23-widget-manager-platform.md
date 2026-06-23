@@ -2236,6 +2236,7 @@ class DataSourcesPage(Gtk.Box):
         box.pack_start(header, False, False, 0)
         frame.add(box)
         self._container.pack_start(frame, False, False, 0)
+        frame.show_all()                                  # 窗口 show_all 早已发生,后加的子树须自行 show
         self._groups[pid] = box
         return box
 
