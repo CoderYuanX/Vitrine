@@ -14,7 +14,6 @@ class Conn:
 class Reply:
     direct: list = field(default_factory=list)
     broadcast_status: bool = False
-    repoll: list = field(default_factory=list)
     reset_timer: list = field(default_factory=list)
     shutdown: bool = False
     close: bool = False
@@ -148,7 +147,7 @@ class Hub:
             self._config.intervals[topic] = float(iv)
             self._persist()                                  # 持久化(运行中改动写回)
             return Reply(direct=[{"type": "ok", "id": rid}], broadcast_status=True,
-                         repoll=[topic], reset_timer=[topic])
+                         reset_timer=[topic])
 
         if action == "shutdown":
             return Reply(direct=[{"type": "ok", "id": rid}], shutdown=True)

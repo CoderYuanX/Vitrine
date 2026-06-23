@@ -117,7 +117,6 @@ def test_set_interval_valid_repolls():
                                          "topic": "system.cpu", "interval": 3.0})
     assert reply.direct[0] == {"type": "ok", "id": "i"}
     assert h.interval("system.cpu") == 3.0
-    assert reply.repoll == ["system.cpu"]
     assert reply.reset_timer == ["system.cpu"]
     assert reply.broadcast_status is True
 

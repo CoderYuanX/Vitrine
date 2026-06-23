@@ -182,6 +182,9 @@ def start_in_thread(hub: Hub, host: str = "127.0.0.1", port: int = 0, heartbeat:
             ready_task = asyncio.create_task(server.serve())
             # 等 actual_port 就绪后通知
             while server.actual_port() is None:
+                if ready_task.done():
+                    await ready_task   # serve() ended before binding — re-raise its error
+                    return
                 await asyncio.sleep(0.01)
             ready.set()
             await ready_task

@@ -51,6 +51,9 @@ def main(argv=None) -> int:
         async def main_coro():
             serve_task = asyncio.create_task(server.serve())
             while server.actual_port() is None:
+                if serve_task.done():
+                    await serve_task   # serve() ended before binding — re-raise its error
+                    return             # (defensive) if it returned cleanly, stop waiting
                 await asyncio.sleep(0.01)
             write_runtime(runtime_path, pid=os.getpid(),
                           port=server.actual_port(), token=token,
