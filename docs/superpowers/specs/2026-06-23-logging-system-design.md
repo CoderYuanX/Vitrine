@@ -54,7 +54,7 @@ RuntimeError: ...
 ## 轮转与清理(三重保险,确保不无限增长)
 
 1. **`TimedRotatingFileHandler`**:`when="midnight"`、`backupCount=retention_days`(默认 7)、`encoding="utf-8"`、`delay=False`(setup 后随即写启动行,文件即建,便于立刻收紧权限)、`utc=False`(桌面应用用本地时间,排障对得上系统时钟)。每天切一份,超过保留份数的旧文件由 handler 自动删除。
-2. **启动清理**:`setup_logging` 启动时只扫**本系统已知前缀**的文件 —— `core.log*` 与 `manager.log*`(常量列表,非 `*.log*`,避免误删目录内其它文件),删除 **mtime 早于 `now - retention_days` 天**者。兜住「进程久不写 / 已退出」导致 handler 不触发删除的漏网文件,以及两端互相遗留的旧文件。轮转产生的 `core.log.2026-06-16` 等后缀文件也被该前缀匹配清理;**实现与测试都不假设具体后缀格式**,只按前缀 + mtime 判定。
+2. **启动清理**:`setup_logging` 启动时只扫**本系统已知前缀**的文件 —— `core.log*` 与 `manager.log*`(常量列表,非 `*.log*`,避免误删目录内其它文件),删除 **mtime 早于 `now - retention_days` 天**者。兜住「进程久不写 / 已退出」导致 handler 不触发删除的漏网文件,以及两端互相遗留的旧文件。轮转产生的 `core.log.2026-06-16` 等后缀文件也被该前缀匹配清理;**实现与测试都不假设具体后缀格式**,只按前缀 + mtime 判定。**单个文件 `unlink` 失败(权限 / 占用 / 竞态)不得阻断启动**(回应评审 3-4):捕获异常、记一条 WARNING 后继续清理其余文件。
 3. **保留天数可配**:默认 7,环境变量 `MANAGEWIDGETS_LOG_RETENTION_DAYS` 覆盖(非整数 / ≤0 等非法值回退默认 7)。
 
 > 说明:即便 handler 在某些进程生命周期下不切分,启动清理也保证目录内不会留下 > N 天的日志。
@@ -81,14 +81,16 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 - **`getLogger(component).propagate = False`**(回应评审 2-1):不能依赖「根无 handler」—— pytest 的 `caplog`、用户 shell、外层包装器都可能给根挂 handler,届时 `propagate=True` 会让同一条记录冒泡到根被**重复输出 / 二次格式化**。关掉传播,组件日志完全由本系统 handler 掌控。(未 `setup_logging` 就独立调用 `core.config.load_config()` 的场景不受影响:那时没动过 `core` logger 的 propagate,仍走默认传播 / lastResort。)
 
 行为:
+- **校验 `component`**(回应评审 3-5):仅接受 `"core"` / `"manager"`,其余直接 `ValueError`,杜绝意外用任意值生成任意文件名日志(也与启动清理的固定前缀保持一致)。
 - 在 `log_dir` 下建目录;**无论目录是否已存在,都 `chmod(0o700)`**(回应评审 2-2)—— `mkdir(exist_ok=True)` 不会收紧已存在的宽权限目录,必须显式 chmod。随后执行**启动清理**(删 > retention_days 的旧日志)。
 - 解析级别:`level` 入参 > env `MANAGEWIDGETS_LOG_LEVEL` > 缺省 INFO。接受**大小写不敏感**的名称 `DEBUG/INFO/WARNING/ERROR/CRITICAL` 及对应整数字符串;**非法值回退 INFO**。解析函数返回 `(numeric_level, warning_or_None)`;**该回退 WARNING 必须在 handler 挂好之后**用组件 logger 发出(回应评审 2-4),否则会丢失或只进 lastResort。
 - 把组件 logger 级别设为解析出的数值级别,使记录能下发到 handler;各 handler 再按自身级别过滤。
 - 给该 **组件 logger** 挂两个 handler:
   - `TimedRotatingFileHandler` → `{component}.log`,级别 = 解析级别。
   - `StreamHandler(sys.stderr)`,级别 = `max(numeric_level, logging.WARNING)` —— 终端只显示要紧的,不被 INFO 刷屏;若 env 把级别调到 ERROR,则 stderr 同步收紧到 ERROR。
-- **文件权限 `0o600`**(回应评审 2):日志含 pid/port/路径/堆栈等本地诊断信息,与 `core.json` 的 0600 一致。用自定义 `_open`(`open(..., opener=lambda p, f: os.open(p, f, 0o600))`)的 `TimedRotatingFileHandler` 子类,保证**初始与轮转新建**的文件都是 0600。
+- **文件权限 `0o600`**(回应评审 2):日志含 pid/port/路径/堆栈等本地诊断信息,与 `core.json` 的 0600 一致。做法:子类化 `TimedRotatingFileHandler` 并**重写 `_open()`**,内部仍调内置 `open(self.baseFilename, self.mode, encoding=self.encoding, opener=lambda path, flags: os.open(path, flags, 0o600))` —— `open` 的 `opener` 回调收 `(path, flags)`、用 `os.open` 以 0o600 创建并返回 fd(**不是**把整个 `_open` 换成 `os.open`,它需返回 stream 而非 fd)。如此**初始与轮转新建**的文件都是 0600。
 - **幂等**:重入时先移除组件 logger 上带 `_managewidgets=True` 标记的旧 handler 再挂。保障测试与潜在多次调用安全。
+- **挂好 handler 后写一条启动行**(回应评审 3-1):`setup_logging` 自身发 `logger.info("logging initialized: component=… level=… retention=…d file=<path>")`(均为非敏感字段)。这让文件创建语义明确、测试 1 有确定内容可读,并把级别回退 WARNING(若有)按正确顺序落盘。
 - 返回主日志文件 `Path`。
 
 调用点:
@@ -116,7 +118,7 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 
 ## 测试
 
-新增 `tests/test_logs.py`(纯逻辑,不依赖 GTK,不碰真实 home —— 全部 `log_dir=tmp_path` 注入;每个用例先清理被测组件 logger 的 handler 以隔离状态):
+新增 `tests/test_logs.py`(纯逻辑,不依赖 GTK,不碰真实 home —— 全部 `log_dir=tmp_path` 注入)。**测试隔离**(回应评审 3-2):用一个 fixture 在每个用例前后,对 `core` / `manager` logger **移除本系统 handler 并把 `propagate` 还原为 `True`、level 还原**,避免 `propagate=False` 等改动串扰后续用例(也含本套件外的用例):
 
 1. `setup_logging` 在指定 `log_dir` 建出 `{component}.log`,写一条 INFO 后**读文件**确认含该行。
 2. 级别:`level="WARNING"`(或 env)时 INFO 不落、WARNING 落。
