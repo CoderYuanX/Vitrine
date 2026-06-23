@@ -304,7 +304,7 @@ git commit -m "feat(core): SystemProvider(CPU/内存)"
 **Interfaces:**
 - Produces:
   - 常量:`DEFAULT_PORT = 35355`、`INTERVAL_MIN = 0.5`、`INTERVAL_MAX = 3600.0`
-  - `@dataclass class Config`: 字段 `port: int`、`providers_enabled: dict[str, bool]`、`intervals: dict[str, float]`、`autostart: bool`;类方法 `Config.default() -> Config`
+  - `@dataclass class Config`: 字段 `port: int`、`providers_enabled: dict[str, bool]`、`intervals: dict[str, float]`(**不含 autostart——自启状态以 `.desktop` 文件为准,见 Task 11**);类方法 `Config.default() -> Config`
   - `default_config_path() -> pathlib.Path`(`~/.config/managewidgets/config.toml`)
   - `load_config(path: Path) -> tuple[Config, list[dict]]`:返回 `(config, notices)`;`notices` 每项 `{"code": str, "message": str}`。文件不存在→默认配置+空 notices;文件损坏→把原文件改名为 `config.toml.bak.<UTC紧凑时间戳>`、返回默认配置 + `[{"code":"config_reset","message": ...}]`
   - `save_config(cfg: Config, path: Path) -> None`:原子写(临时文件→rename),父目录自动创建
@@ -378,12 +378,13 @@ INTERVAL_MIN = 0.5
 INTERVAL_MAX = 3600.0
 
 
+# 说明:自启状态以 XDG `~/.config/autostart/*.desktop` 文件为单一事实来源(见 Task 11),
+# 不在 config.toml 里重复保存,避免两处状态不一致。这一处细化了 spec §3.6。
 @dataclass
 class Config:
     port: int = DEFAULT_PORT
     providers_enabled: dict = field(default_factory=lambda: {"system": True, "time": True})
     intervals: dict = field(default_factory=dict)   # topic -> 覆盖间隔;缺省走 provider 默认
-    autostart: bool = False
 
     @classmethod
     def default(cls) -> "Config":
@@ -394,7 +395,6 @@ class Config:
             "port": self.port,
             "providers_enabled": self.providers_enabled,
             "intervals": self.intervals,
-            "autostart": self.autostart,
         }
 
     @classmethod
@@ -404,7 +404,6 @@ class Config:
             port=int(d.get("port", base.port)),
             providers_enabled={**base.providers_enabled, **d.get("providers_enabled", {})},
             intervals={str(k): float(v) for k, v in d.get("intervals", {}).items()},
-            autostart=bool(d.get("autostart", base.autostart)),
         )
 
 
@@ -1078,7 +1077,7 @@ git commit -m "feat(core): Hub 鉴权 + 控制动作 + 校验"
     - `def actual_port() -> int`(绑定后的真实端口)
     - `def _full_status(self, notices=None) -> dict`(server 组装 `core` 实时段 port/clients/uptime/version + `hub.providers_snapshot()`)
     - `async def stop()` / `def stop_threadsafe()`(优雅停)
-    - 内部:每个 active topic 一个 `asyncio.Task`,`sleep(interval) → poll → record → 推送订阅者`;`reset_timer` 取消并以"立即 poll 一次再进周期"重启;`set_provider` 改 enabled 后按 `is_active` 同步启停 topic 任务;`status_request_id` 时给请求方回 `{type:status,id,...}`;`broadcast_status` 与心跳向所有已鉴权连接发 `status`
+    - 内部:每个 active topic 一个 `asyncio.Task`,`sleep(interval) → poll → record → 推送订阅者`;**poll 抛异常 → record(error) 并立即 `_broadcast_status()`**(面板即时见错误态);`reset_timer` 取消并以"立即 poll 一次再进周期"重启;`set_provider` 改 enabled 后按 `is_active` 同步启停 topic 任务;`status_request_id` 时给请求方回 `{type:status,id,...}`;`broadcast_status` 与心跳向所有已鉴权连接发 `status`
   - `start_in_thread(hub, host, port, heartbeat=2.0) -> tuple[CoreServer, threading.Thread, int]`:后台线程跑 `serve`,返回 server、线程、真实端口
 
 - [ ] **Step 1: 写失败测试 `tests/test_core_integration.py`**
@@ -1091,6 +1090,7 @@ from websockets.sync.client import connect
 
 from core.config import Config
 from core.hub import Hub
+from core.providers.base import Provider
 from core.providers.system import SystemProvider
 from core.providers.time import TimeProvider
 from core.server import start_in_thread
@@ -1098,6 +1098,19 @@ from core.server import start_in_thread
 
 def _hub():
     return Hub([SystemProvider(), TimeProvider()], Config.default(), token="secret")
+
+
+class BoomProvider(Provider):
+    id = "boom"
+
+    def topics(self):
+        return ["boom.x"]
+
+    def default_interval(self, topic):
+        return 0.5
+
+    def poll(self, topic):
+        raise RuntimeError("boom")
 
 
 # 注意:server 每 ~2s 广播一次 status 心跳,故 data/ok/status 帧会交错。
@@ -1200,6 +1213,26 @@ def test_disable_provider_stops_topic():
             assert drained
     finally:
         server.stop_threadsafe(); thread.join(timeout=5)
+
+
+def test_provider_error_broadcasts_status():
+    hub = Hub([BoomProvider()], Config.default(), token="secret")
+    server, thread, port = start_in_thread(hub, "127.0.0.1", 0)
+    try:
+        with connect(f"ws://127.0.0.1:{port}") as ws:
+            _hello(ws)
+            # poll 抛异常后 server 立即广播 status:provider=error、topic.last_error 有值
+            status = _recv_until(
+                ws,
+                lambda m: m.get("type") == "status"
+                and any(p["id"] == "boom" and p["status"] == "error"
+                        for p in m["status"]["providers"]),
+                timeout=4,
+            )["status"]
+            boom = next(p for p in status["providers"] if p["id"] == "boom")
+            assert boom["topics"][0]["last_error"] is not None
+    finally:
+        server.stop_threadsafe(); thread.join(timeout=5)
 ```
 
 > 用 `ws.recv(timeout=2)`(websockets 16 sync API 支持 `timeout` 形参)。所有断言按"读到匹配帧为止",因此与 status 心跳帧交错无关。
@@ -1290,6 +1323,7 @@ class CoreServer:
                     await self._push(topic, value)
                 except Exception as exc:                 # provider 采集异常:记错,不杀循环
                     self._hub.record(topic, None, ts=time.time(), error=str(exc))
+                    await self._broadcast_status()       # 立即让面板看到错误态,不等心跳
                 await asyncio.sleep(self._hub.interval(topic))
         except asyncio.CancelledError:
             return
@@ -1406,7 +1440,7 @@ def start_in_thread(hub: Hub, host: str = "127.0.0.1", port: int = 0, heartbeat:
 - [ ] **Step 4: 运行确认通过**
 
 Run: `.venv/bin/python -m pytest tests/test_core_integration.py -v`
-Expected: PASS（4 passed;若个别用例因时序偶发,重跑确认稳定）
+Expected: PASS（5 passed;若个别用例因时序偶发,重跑确认稳定）
 
 - [ ] **Step 5: 提交**
 
@@ -1697,7 +1731,7 @@ git commit -m "feat(core): 底座入口 实例锁/runtime/优雅停止/配置持
   - `manager/ws_client.py`:`class CoreClient`
     - `__init__(self, host, port, token, on_event, on_state)`:`on_event(dict)`/`on_state(str)` 由调用方负责切回 GTK 主线程
     - `start()`:起后台线程跑 asyncio loop,连后先发 `hello`+token,再回放调用方设定的订阅;断线指数退避重连(0.5→1→2→…→最多 10s)
-    - `subscribe(topics: list[str])`、`send(msg: dict, on_reply=None)`:线程安全(经 `loop.call_soon_threadsafe` 投递)
+    - `subscribe(topics: list[str])`、`send(msg: dict, on_reply=None)`:线程安全;**消息入待发队列,未连上/重连中不丢,连上(hello ok)后统一 flush**;`subscribe` 另记入 `self._subs` 供每次重连后重订阅
     - `is_connected() -> bool`:是否已鉴权连上(供面板"停止底座"决定走 WS shutdown 还是 SIGTERM 兜底)
     - `stop()`:停 loop、关连接、join 线程
     - 回包关联:带 `id` 的请求,其 `ok`/`error` 响应据 `id` 回调 `on_reply`
@@ -1802,6 +1836,30 @@ def test_client_connects_subscribes_and_receives():
         server.stop_threadsafe(); thread.join(timeout=5)
 
 
+def test_send_before_connect_is_queued_and_delivered():
+    server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
+    events = []
+    lock = threading.Lock()
+    client = CoreClient("127.0.0.1", port, "secret",
+                        on_event=lambda m: (lock.acquire(), events.append(m), lock.release()),
+                        on_state=lambda s: None)
+    client.start()
+    client.send({"id": "ls", "action": "list_providers"})   # 紧接 start,此刻多半还没连上
+    try:
+        deadline = time.time() + 4
+        got = False
+        while time.time() < deadline:
+            with lock:
+                got = any(m.get("type") == "status" and m.get("id") == "ls" for m in events)
+            if got:
+                break
+            time.sleep(0.1)
+        assert got                                          # 未连上时入队,连上后送达,不丢
+    finally:
+        client.stop()
+        server.stop_threadsafe(); thread.join(timeout=5)
+
+
 def test_client_rejected_on_bad_token_then_state_reports():
     server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
     states = []
@@ -1847,6 +1905,8 @@ class CoreClient:
         self._connected = False                           # 是否已鉴权连上(供面板停止决策)
         self._subs = set()
         self._pending = {}                                # id -> on_reply
+        self._outbox = []                                 # 待发送队列(未连上时暂存,连上后 flush)
+        self._outlock = threading.Lock()
 
     def is_connected(self) -> bool:
         return self._connected
@@ -1856,24 +1916,30 @@ class CoreClient:
         self._thread.start()
 
     def subscribe(self, topics):
-        self._subs.update(topics)
-        self._post({"action": "subscribe", "topics": list(topics)})
+        self._subs.update(topics)                         # 记下以便每次(重)连后重订阅
+        self.send({"action": "subscribe", "topics": list(topics)})
 
     def send(self, msg, on_reply=None):
+        # 入队而非直发:未连上/重连中也不丢,连上(hello ok)后统一 flush
         if on_reply and msg.get("id"):
             self._pending[msg["id"]] = on_reply
-        self._post(msg)
-
-    def _post(self, msg):
+        with self._outlock:
+            self._outbox.append(msg)
         if self._loop:
-            self._loop.call_soon_threadsafe(lambda: self._loop.create_task(self._send_now(msg)))
+            self._loop.call_soon_threadsafe(lambda: self._loop.create_task(self._flush()))
 
-    async def _send_now(self, msg):
-        if self._ws is not None:
+    async def _flush(self):
+        if self._ws is None or not self._connected:
+            return
+        with self._outlock:
+            pending, self._outbox = self._outbox, []
+        for m in pending:
             try:
-                await self._ws.send(json.dumps(msg))
+                await self._ws.send(json.dumps(m))
             except Exception:
-                pass
+                with self._outlock:                       # 发送失败 → 放回队首,待重连后重发
+                    self._outbox[:0] = [m]
+                break
 
     def _run(self):
         asyncio.run(self._main())
@@ -1897,8 +1963,10 @@ class CoreClient:
                     self._connected = True
                     self._on_state("connected")
                     backoff = 0.5
-                    if self._subs:
-                        await ws.send(json.dumps({"action": "subscribe", "topics": list(self._subs)}))
+                    if self._subs:                        # 每次(重)连重订阅 + flush 暂存的控制消息
+                        with self._outlock:
+                            self._outbox.insert(0, {"action": "subscribe", "topics": list(self._subs)})
+                    await self._flush()
                     async for raw in ws:
                         msg = json.loads(raw)
                         rid = msg.get("id")
@@ -1934,7 +2002,7 @@ class CoreClient:
 - [ ] **Step 8: 运行确认通过**
 
 Run: `.venv/bin/python -m pytest tests/test_ws_client.py tests/test_discovery.py -v`
-Expected: PASS（5 passed）
+Expected: PASS（6 passed）
 
 - [ ] **Step 9: 提交**
 
@@ -2382,11 +2450,15 @@ Expected: PASS（1 passed）
 ```markdown
 # managewidgets
 
-桌面小组件管理器(第一版:数据底座 + 管理面板)。
+桌面小组件管理器(第一版:数据底座 + 管理面板)。X11 优先,GTK3。
 
-## 安装
+## 系统依赖(PyGObject 无法用 pip 装,需系统包)
+    # Debian/Deepin 系:
+    sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+
+## 安装(其余依赖装进 venv)
     python3 -m venv --system-site-packages .venv
-    .venv/bin/pip install tomli-w
+    .venv/bin/pip install psutil websockets tomli-w pytest
 
 ## 运行
     .venv/bin/python -m core       # 底座
@@ -2415,4 +2487,3 @@ git commit -m "feat: autostart 开关 + README + 全量回归"
 - **覆盖**:provider 框架/system/time(T1-2)、配置+损坏回退(T3)、runtime+token+flock+cmdline 识别三入口(T4)、协议+鉴权+校验+**配置持久化 on_change**(T5-6)、传输+调度+立即重采+**端口回退集成进 serve**+**心跳**(T7)、入口+实例锁+优雅停+**配置写回**+**config_reset notice**(T8)、发现+WS 客户端+重连+回包关联+**is_connected**(T9)、GTK3 三页+按 provider 分组+notices+**一键启动重连/SIGTERM 兜底停止**(T10)、autostart(T11)。spec §3-§9 各节均有对应 task。
 - **DoD 对齐**:§9 的 11 条验收分散在 T7(数据实时/改间隔/停 provider)、T8(runtime/token/0600/二实例/SIGTERM/**config_reset notice**/**改动持久化**)、T9-T10(自动重连/**一键启动闭环**/**WS+SIGTERM 停止**)、手动 E2E(T10 Step5,逐项)。**配置持久化、config_reset notice、启动/停止闭环**均有自动化或显式手动验证,不留到实现时临场补。
 - **类型一致**:`Hub.handle` 返回 `Reply`(含 `status_request_id`);`Conn` 字段 `authed/subscriptions`;`providers` 数组由 `Hub.providers_snapshot()` 产出,`core` 实时段(`port/clients/uptime/version/notices`)由 `CoreServer._full_status()` 组装,二者拼成完整 `status` 后被 datasources/overview 消费,字段名(`core.port`、`core.notices`、`providers[].topics[].last_value`)一致。`list_providers` 与心跳/`broadcast_status` 走同一 `_full_status`。
-- **未决实现注记**:Task 7 的端口回退在 Task 8 Step4 回补(已显式说明顺序),实现者须先补回退再跑 main_cli。
