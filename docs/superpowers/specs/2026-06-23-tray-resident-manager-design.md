@@ -155,7 +155,7 @@ disconnected}.svg`,构造时 `Indicator.new_with_path(..., icon_theme_path=
 
 ```
 登录(自启 -m manager)
-  → ManagerApp.do_activate:建窗口+建托盘+hold
+  → ManagerApp.do_activate:建窗口 + 尝试建托盘;托盘成功才 hold(缺库则不 hold)
   → discover + 连(CoreClient 退避);宽限期 ~2s 内仍未连上 → _start_core 拉起 core
   → CoreClient 连上 → on_state("connected") → 概览页 + tray.set_connection("connected", port)
   → status 帧 → _last_port 更新 → 数据源页/概览页刷新 + tray 端口显示刷新

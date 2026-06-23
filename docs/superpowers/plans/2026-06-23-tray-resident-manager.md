@@ -361,7 +361,7 @@ class TrayIndicator:
 - [ ] **Step 6: 运行确认通过**
 
 Run: `.venv/bin/python -m pytest tests/test_manager_tray.py -v`
-Expected: PASS(1 passed;无显示/无库环境 SKIP)
+Expected: PASS(2 passed;无显示/无库环境 SKIP)
 
 - [ ] **Step 7: 提交**
 
@@ -759,7 +759,7 @@ if __name__ == "__main__":
 - [ ] **Step 5: 运行确认通过(冒烟 + 逻辑 + 全量回归)**
 
 Run: `.venv/bin/python -m pytest tests/test_manager_app_logic.py tests/test_manager_smoke.py -v`
-Expected: PASS(app 逻辑 5 例全过;冒烟含新 `test_overview_autostart_sync_no_feedback_loop`)
+Expected: PASS(app 逻辑 4 例全过;冒烟含新 `test_overview_autostart_sync_no_feedback_loop`)
 Run: `.venv/bin/python -m pytest -q`
 Expected: PASS(全过;无显示环境下 GUI 冒烟/托盘用例 SKIP,app 逻辑用例不依赖显示照常跑)
 
