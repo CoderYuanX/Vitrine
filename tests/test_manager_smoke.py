@@ -71,3 +71,13 @@ def test_datasources_syncs_state_without_feedback_loop():
     assert sw.get_active() is False                       # 开关已同步
     assert spin.get_value() == 5.0                        # 间隔已同步
     assert prov_calls == [] and iv_calls == []            # 程序化同步未回环触发控制命令
+
+
+def test_overview_autostart_sync_no_feedback_loop():
+    from manager.pages.overview import OverviewPage
+    calls = []
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
+                      on_autostart=lambda e: calls.append(e))
+    ov.set_autostart_active(True)
+    assert ov._autostart.get_active() is True
+    assert calls == []                        # 程序化同步未回环触发 on_autostart
