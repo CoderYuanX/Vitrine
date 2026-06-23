@@ -133,6 +133,7 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 8. `retention_days` 经 env `MANAGEWIDGETS_LOG_RETENTION_DAYS` 可覆盖;非整数 / ≤0 回退默认 7。
 9. **级别非法回退已落盘**(回应评审 2-4/5/5-2):`MANAGEWIDGETS_LOG_LEVEL="bogus"` → 实际级别为 INFO,且**读 `{component}.log`** 确认回退 WARNING 已写入,文本含原始值 `bogus`、来源 `env`、`INFO`(精确断言而非模糊查 WARNING,证明 warning 在 handler 挂好后才发)。
 10. **回退覆盖入参路径与越界整数**(回应评审 4-2/4-3):`setup_logging(component, level="bogus")` 也回退 INFO(与 env 路径独立);`level="999"` / `level=999`(非标准数值)同样回退 INFO,而 `level="30"` / `level=30` 正常解析为 WARNING。
+11. **非法 component 抛错且不建文件**(回应评审 6):`setup_logging("bad/name", log_dir=tmp_path)` 抛 `ValueError`,且 `log_dir` 下不产生任何日志文件(校验先于建目录/挂 handler)。
 
 埋点侧(回应评审 7,证明落盘链路完整而非仅 logger 被调用):在 `tests/test_core_integration.py` 先 `setup_logging("core", log_dir=tmp_path)`,跑 `BoomProvider` 触发 poll 异常,**读 `core.log`** 断言含 provider 名 / topic / 异常文本(`boom`)。
 
