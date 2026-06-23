@@ -99,3 +99,14 @@ def test_reconnect_when_ready_gives_up_after_timeout(monkeypatch):
     assert app._reconnect_when_ready() is False  # 到上限 → 停轮询
     assert reconnects == []                      # 超时不重连
     assert app._start_polls_active is False
+
+
+def test_minimize_hides_to_tray_only_when_tray_present():
+    # 最小化(iconify)行为:有托盘 → 收进托盘(返回 True 表示应 hide,不留 dock 条目);
+    # 无托盘(降级)→ 保持系统默认最小化(False),否则窗口最小化即消失且无处唤回。
+    app = _app()
+    app._tray = object()
+    assert app._minimize_should_hide(True) is True       # 有托盘 + 最小化 → 收托盘
+    assert app._minimize_should_hide(False) is False     # 非最小化(还原)→ 不动作
+    app._tray = None
+    assert app._minimize_should_hide(True) is False      # 无托盘 → 不接管最小化

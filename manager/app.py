@@ -53,6 +53,7 @@ class ManagerApp(Gtk.Application):
         nb.append_page(WidgetsPlaceholderPage(), Gtk.Label(label="小组件"))
         win.add(nb)
         win.connect("delete-event", self._on_close)       # 接管 ×,不直接销毁
+        win.connect("window-state-event", self._on_window_state)  # 最小化 → 收进托盘,不留 dock 条目
         win.show_all()
 
         self._tray = self._build_tray()                   # 缺库 → None(降级)
@@ -115,6 +116,19 @@ class ManagerApp(Gtk.Application):
             self._quit()
         # 其它(关掉对话框)→ 窗口保持,不动作
         return True
+
+    def _minimize_should_hide(self, iconified):
+        # 托盘存在时,最小化(iconify)应改为收进托盘(hide 才能从 dock/任务栏移除条目);
+        # 无托盘(降级)时保持系统默认最小化,否则窗口最小化即消失且无处可唤回。
+        return bool(iconified) and self._tray is not None
+
+    def _on_window_state(self, win, event):
+        from gi.repository import Gdk
+        iconified = bool(event.new_window_state & Gdk.WindowState.ICONIFIED)
+        if (event.changed_mask & Gdk.WindowState.ICONIFIED) and self._minimize_should_hide(iconified):
+            win.deiconify()                                # 清掉 iconified 态,下次唤出才干净
+            self._hide_window()                            # hide():从 dock/任务栏彻底移除条目
+        return False
 
     def _hide_window(self):
         self._win.hide()
