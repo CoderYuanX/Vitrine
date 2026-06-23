@@ -176,6 +176,7 @@ class CoreServer:
 def start_in_thread(hub: Hub, host: str = "127.0.0.1", port: int = 0, heartbeat: float = 2.0):
     server = CoreServer(hub, host, port, heartbeat=heartbeat)
     ready = threading.Event()
+    error = []                                            # serve 启动失败时把异常带回主线程
 
     def run():
         async def main():
@@ -183,14 +184,21 @@ def start_in_thread(hub: Hub, host: str = "127.0.0.1", port: int = 0, heartbeat:
             # 等 actual_port 就绪后通知
             while server.actual_port() is None:
                 if ready_task.done():
-                    await ready_task   # serve() ended before binding — re-raise its error
+                    await ready_task   # serve() 在绑定前就结束 → re-raise 其异常
                     return
                 await asyncio.sleep(0.01)
             ready.set()
             await ready_task
-        asyncio.run(main())
+        try:
+            asyncio.run(main())
+        except Exception as exc:                          # 绑定失败等:带回调用方,别让其拿到 port=None
+            error.append(exc)
+            ready.set()                                   # 立即解除等待,不空等 5s
 
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
-    ready.wait(timeout=5)
+    if not ready.wait(timeout=5):
+        raise TimeoutError("core server 未在 5s 内就绪")
+    if error:
+        raise error[0]
     return server, thread, server.actual_port()
