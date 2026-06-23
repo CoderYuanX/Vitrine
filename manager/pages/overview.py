@@ -24,11 +24,18 @@ class OverviewPage(Gtk.Box):
         self._autostart = Gtk.Switch()
         from core.autostart import is_autostart_enabled
         self._autostart.set_active(is_autostart_enabled())
-        self._autostart.connect("notify::active", lambda s, _p: on_autostart(s.get_active()))
+        self._autostart_handler = self._autostart.connect(
+            "notify::active", lambda s, _p: on_autostart(s.get_active()))
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row.pack_start(Gtk.Label(label="开机自启", xalign=0), False, False, 0)
         row.pack_start(self._autostart, False, False, 0)
         self.pack_start(row, False, False, 0)
+
+    def set_autostart_active(self, enabled):
+        # 与托盘项联动:程序化同步,阻塞信号避免回环触发 on_autostart
+        self._autostart.handler_block(self._autostart_handler)
+        self._autostart.set_active(bool(enabled))
+        self._autostart.handler_unblock(self._autostart_handler)
 
     def set_connection(self, state):
         self._conn.set_text({"connected": "已连接", "disconnected": "未连接",
