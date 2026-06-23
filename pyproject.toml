@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "managewidgets"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["psutil>=5.9", "websockets>=12", "tomli-w>=1.0"]
+
+[project.scripts]
+managewidgets-core = "core.__main__:main"
+managewidgets-manager = "manager.app:main"
+
+[tool.setuptools.packages.find]
+include = ["core*", "manager*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
