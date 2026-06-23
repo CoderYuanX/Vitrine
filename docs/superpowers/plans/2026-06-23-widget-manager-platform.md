@@ -912,7 +912,7 @@ def test_set_provider_unknown():
     assert reply.direct[0]["code"] == "unknown_provider"
 
 
-def test_set_interval_valid_repolls():
+def test_set_interval_valid_resets_timer():
     h = make_hub()
     reply = h.handle(Conn(authed=True), {"id": "i", "action": "set_interval",
                                          "topic": "system.cpu", "interval": 3.0})
