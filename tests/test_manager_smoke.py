@@ -36,6 +36,19 @@ def test_datasources_update_renders_topics():
     assert ds.has_topic_row("system.cpu")
 
 
+def test_datasources_group_visible_after_update():
+    # 回归:动态新增的 provider 组 frame 必须 show_all,否则数据源页一片空白
+    # (窗口 show_all 早于数据到达,后加的子树默认不可见)。
+    from manager.pages.datasources import DataSourcesPage
+    ds = DataSourcesPage(on_set_provider=lambda p, e: None, on_set_interval=lambda t, i: None)
+    ds.update({"providers": [{"id": "system", "enabled": True, "status": "running",
+        "topics": [{"topic": "system.cpu", "interval": 1.0, "last_value": {"percent": 5.0},
+                    "last_ts": 1.0, "last_error": None}]}]})
+    assert ds._switches["system"]["switch"].get_visible() is True   # 启用开关可见
+    assert ds._groups["system"].get_visible() is True               # 组容器可见
+    assert ds._rows["system.cpu"]["spin"].get_visible() is True     # 间隔 SpinButton 可见
+
+
 def test_datasources_syncs_state_without_feedback_loop():
     # 别的客户端改了 provider/间隔后,下一帧 status 必须把开关与 SpinButton 同步到新状态,
     # 且程序化同步不得回环触发 set_provider/set_interval。
