@@ -100,3 +100,92 @@ def test_cleanup_failure_collected_not_raised(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "unlink", boom)
     warnings = _cleanup_old_logs(tmp_path, 7)
     assert any("core.log.old" in w for w in warnings)      # 失败被收集而非抛出
+
+
+import pytest
+
+from core import logs
+
+
+@pytest.fixture(autouse=True)
+def _restore_component_loggers():
+    saved = {}
+    for name in ("core", "manager"):
+        lg = logging.getLogger(name)
+        saved[name] = (lg.level, lg.propagate)
+    yield
+    for name, (level, propagate) in saved.items():
+        lg = logging.getLogger(name)
+        for h in [h for h in lg.handlers if getattr(h, "_managewidgets", False)]:
+            lg.removeHandler(h)
+            h.close()
+        lg.setLevel(level)
+        lg.propagate = propagate
+
+
+def test_creates_file_and_writes(tmp_path):
+    path = logs.setup_logging("core", log_dir=tmp_path)
+    logging.getLogger("core.x").info("hello-line")
+    assert path == tmp_path / "core.log"
+    assert "hello-line" in path.read_text()
+
+
+def test_level_filtering(tmp_path):
+    path = logs.setup_logging("core", log_dir=tmp_path, level="WARNING")
+    logging.getLogger("core.x").info("info-line")
+    logging.getLogger("core.x").warning("warn-line")
+    text = path.read_text()
+    assert "info-line" not in text and "warn-line" in text
+
+
+def test_idempotent_no_handler_doubling(tmp_path):
+    logs.setup_logging("core", log_dir=tmp_path)
+    logs.setup_logging("core", log_dir=tmp_path)
+    lg = logging.getLogger("core")
+    tagged = [h for h in lg.handlers if getattr(h, "_managewidgets", False)]
+    assert len(tagged) == 2                                # 1 file + 1 stream,非 4
+
+
+def test_same_process_isolation(tmp_path):
+    logs.setup_logging("core", log_dir=tmp_path)
+    logs.setup_logging("manager", log_dir=tmp_path)
+    logging.getLogger("core.a").info("from-core")
+    logging.getLogger("manager.b").info("from-manager")
+    core_text = (tmp_path / "core.log").read_text()
+    mgr_text = (tmp_path / "manager.log").read_text()
+    assert "from-core" in core_text and "from-core" not in mgr_text
+    assert "from-manager" in mgr_text and "from-manager" not in core_text
+
+
+def test_permissions_dir_and_file(tmp_path):
+    d = tmp_path / "logs"
+    d.mkdir()
+    os.chmod(d, 0o755)
+    path = logs.setup_logging("core", log_dir=d)
+    assert d.stat().st_mode & 0o777 == 0o700               # 已存在目录也收紧
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_invalid_component_raises_and_no_file(tmp_path):
+    with pytest.raises(ValueError):
+        logs.setup_logging("bad/name", log_dir=tmp_path)
+    assert list(tmp_path.glob("*")) == []                  # 校验先于建目录/挂 handler
+
+
+def test_invalid_level_warning_written(tmp_path, monkeypatch):
+    monkeypatch.setenv("MANAGEWIDGETS_LOG_LEVEL", "bogus")
+    path = logs.setup_logging("core", log_dir=tmp_path)
+    text = path.read_text()
+    assert "invalid log level" in text and "bogus" in text and "INFO" in text
+
+
+def test_invalid_level_via_argument_falls_back(tmp_path):
+    logs.setup_logging("core", log_dir=tmp_path, level="bogus")
+    assert logging.getLogger("core").level == logging.INFO
+
+
+def test_retention_env_override_and_invalid(monkeypatch):
+    monkeypatch.setenv("MANAGEWIDGETS_LOG_RETENTION_DAYS", "3")
+    assert logs._resolve_retention_days(None, os.environ.get("MANAGEWIDGETS_LOG_RETENTION_DAYS")) == 3
+    monkeypatch.setenv("MANAGEWIDGETS_LOG_RETENTION_DAYS", "nope")
+    assert logs._resolve_retention_days(None, os.environ.get("MANAGEWIDGETS_LOG_RETENTION_DAYS")) == 7

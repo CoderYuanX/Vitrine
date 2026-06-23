@@ -1,13 +1,19 @@
 import logging
 import os
+import sys
 import time
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
+
+from core.state import default_state_dir
 
 _DEFAULT_RETENTION_DAYS = 7
 _NAME_LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
 _NUMERIC_LEVELS = {10, 20, 30, 40, 50}
 _LOG_PREFIXES = ("core.log", "manager.log")
+_COMPONENTS = ("core", "manager")
+_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+_HANDLER_TAG = "_managewidgets"
 
 
 def _parse_level(raw):
@@ -70,3 +76,51 @@ class _SecureTimedRotatingFileHandler(TimedRotatingFileHandler):
     def _open(self):
         return open(self.baseFilename, self.mode, encoding=self.encoding,
                     opener=lambda path, flags: os.open(path, flags, 0o600))
+
+
+def setup_logging(component, *, log_dir=None, level=None, retention_days=None):
+    if component not in _COMPONENTS:
+        raise ValueError(f"unknown logging component: {component!r}")
+
+    log_dir = Path(log_dir) if log_dir is not None else default_state_dir() / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    os.chmod(log_dir, 0o700)                               # 即便目录已存在也收紧
+
+    retention = _resolve_retention_days(
+        retention_days, os.environ.get("MANAGEWIDGETS_LOG_RETENTION_DAYS"))
+    cleanup_warnings = _cleanup_old_logs(log_dir, retention)   # handler 未挂,暂存 warning
+
+    numeric_level, level_warning = _resolve_level(
+        level, os.environ.get("MANAGEWIDGETS_LOG_LEVEL"))
+
+    logger = logging.getLogger(component)
+    logger.setLevel(numeric_level)
+    logger.propagate = False
+    for h in [h for h in logger.handlers if getattr(h, _HANDLER_TAG, False)]:
+        logger.removeHandler(h)
+        h.close()
+
+    path = log_dir / f"{component}.log"
+    fmt = logging.Formatter(_FORMAT)
+
+    file_handler = _SecureTimedRotatingFileHandler(
+        str(path), when="midnight", backupCount=retention,
+        encoding="utf-8", delay=False, utc=False)
+    file_handler.setLevel(numeric_level)
+    file_handler.setFormatter(fmt)
+    setattr(file_handler, _HANDLER_TAG, True)
+    logger.addHandler(file_handler)
+
+    stream_handler = logging.StreamHandler(sys.stderr)
+    stream_handler.setLevel(max(numeric_level, logging.WARNING))
+    stream_handler.setFormatter(fmt)
+    setattr(stream_handler, _HANDLER_TAG, True)
+    logger.addHandler(stream_handler)
+
+    for msg in cleanup_warnings:                           # handler 挂好后补发延后的 warning
+        logger.warning(msg)
+    if level_warning:
+        logger.warning(level_warning)
+    logger.info("logging initialized: component=%s level=%s retention=%dd file=%s",
+                component, logging.getLevelName(numeric_level), retention, path)
+    return path
