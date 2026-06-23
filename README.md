@@ -10,7 +10,7 @@
   <img alt="GTK" src="https://img.shields.io/badge/GTK-3.0-4A90D9?logo=gnome&logoColor=white">
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Linux%20%2F%20X11-FCC624?logo=linux&logoColor=black">
   <img alt="Desktop" src="https://img.shields.io/badge/Deepin-first-007CFF">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-73%20passing-2ECC71">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-88%20passing-2ECC71">
 </p>
 
 </div>
@@ -82,7 +82,7 @@ python3 -m venv --system-site-packages .venv
 ## 🧪 测试
 
 ```bash
-.venv/bin/python -m pytest -q          # 全量(73 passing)
+.venv/bin/python -m pytest -q          # 全量(88 passing)
 .venv/bin/python -m pytest -v          # 详细
 ```
 
@@ -93,7 +93,9 @@ python3 -m venv --system-site-packages .venv
 ```
 core/                数据底座:provider 采集、WebSocket hub、状态/配置、自启
 manager/             管理面板:GTK3 多页 UI、WS 客户端、托盘封装、本地偏好
-  ├─ app.py          ManagerApp:生命周期 / 关窗到托盘 / 启动拉核 / 状态同步 / 单实例
+  ├─ app.py          ManagerApp:窗口 / 关窗到托盘 / 托盘 / 对话框等纯 UI + on_state/on_event 回调
+  ├─ supervisor.py   CoreSupervisor:底座进程/连接生命周期(发现连接、拉起停止、就绪重连、控制下发);GTK 依赖注入,可脱 GTK 单测
+  ├─ ws_client.py    CoreClient:后台线程 WS 客户端(鉴权、重连退避、请求-应答、断连兜底回调)
   ├─ tray.py         TrayIndicator(AyatanaAppIndicator3)
   ├─ settings.py     面板本地偏好(close_to_tray)+ decide_close + 自启 exec 串
   └─ pages/          概览 / 数据源 / 小组件(占位)
@@ -118,6 +120,17 @@ docs/                spec / plan / 截图
   早于数据到达,后加的子树默认不可见。现 `_ensure_group` 加入容器后调用 `frame.show_all()`。
 - **数据源页开关/间隔不随 status 同步(已修复)**:每帧 status 经 `_sync_switch`/`_sync_interval` 回写,
   并 `handler_block` 屏蔽信号以免回环触发 `set_provider`/`set_interval`。
+- **设置操作失败无任何反馈(已修复)**:`set_provider`/`set_interval` 改为带 `id` 发送并注册 `on_reply`,
+  服务端回 `error` 时弹对话框并刷新权威状态(`list_providers`)。关键在 `ws_client`:此前 `on_reply` 仅在
+  收到同 `id` 的 `ok`/`error` 时触发,连接断开/停止时回调永久悬挂——而断连恰是此处最主要的真实错误场景
+  (`SpinButton`/`Switch` 自身钳值,UI 几乎产生不了服务端校验错误)。现于连接拆除/循环退出时以 `error`
+  兜底触发并清空所有待应答回调,`_pending` 改用同锁保护以消除跨线程竞态。
+- **广播残留死连接(已修复)**:server 广播/推送时,`send` 失败(对端已断)的连接此前要等 recv 循环才察觉。
+  现抽出 `_send_authed`,失败连接就地从 `_conns` 移除,不再对死连接反复无效 `send`。
+- **自启文件名误导(已修复)**:历史文件名 `managewidgets-core.desktop` 实际自启的是面板。已改名为
+  `managewidgets-manager.desktop`,启用时自动迁移清掉旧文件、关闭时新旧一并清除,老用户无需手动处理。
+- **app.py 职责过载(已重构)**:底座进程/连接的整套生命周期抽到独立的 `CoreSupervisor`,`app.py` 只留 UI;
+  GTK 经依赖注入(`idle_add`/`timeout_add`)解耦,supervisor 可脱离 GTK 单测。
 
 当前仍存在、但无害:
 
