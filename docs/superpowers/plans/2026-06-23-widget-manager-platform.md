@@ -1841,9 +1841,12 @@ def test_send_before_connect_is_queued_and_delivered():
     server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
     events = []
     lock = threading.Lock()
-    client = CoreClient("127.0.0.1", port, "secret",
-                        on_event=lambda m: (lock.acquire(), events.append(m), lock.release()),
-                        on_state=lambda s: None)
+
+    def on_event(m):
+        with lock:
+            events.append(m)
+
+    client = CoreClient("127.0.0.1", port, "secret", on_event=on_event, on_state=lambda s: None)
     client.start()
     client.send({"id": "ls", "action": "list_providers"})   # 紧接 start,此刻多半还没连上
     try:
@@ -1866,10 +1869,12 @@ def test_subscribe_after_connected_takes_effect():
     server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
     events = []
     lock = threading.Lock()
-    states = []
-    client = CoreClient("127.0.0.1", port, "secret",
-                        on_event=lambda m: (lock.acquire(), events.append(m), lock.release()),
-                        on_state=lambda s: states.append(s))
+
+    def on_event(m):
+        with lock:
+            events.append(m)
+
+    client = CoreClient("127.0.0.1", port, "secret", on_event=on_event, on_state=lambda s: None)
     client.start()                                       # 注意:连接前不订阅任何 topic
     try:
         deadline = time.time() + 4
