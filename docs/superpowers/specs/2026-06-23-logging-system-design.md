@@ -78,11 +78,11 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 - `core.*` 的记录只进 `core.log`、`manager.*` 只进 `manager.log` —— **同进程内先后 `setup_logging("core")` 再 `setup_logging("manager")` 也天然互不串台**,无需靠 handler 标记区分组件。
 - 每个组件 logger 上的幂等更简单:重入时先移除该 logger 上带标记 `_managewidgets=True` 的旧 handler 再挂。
 - 取舍:第三方库(`websockets`/`asyncio`,日志名不在 `core.*`/`manager.*` 下)不会被捕获到文件。可接受 —— 连接/poll 等要紧事件本系统代码已自行记录;若日后需要,再单独把指定第三方 logger 纳入。
-- `getLogger(component).propagate` 保持默认(根无 handler,不会重复输出)。
+- **`getLogger(component).propagate = False`**(回应评审 2-1):不能依赖「根无 handler」—— pytest 的 `caplog`、用户 shell、外层包装器都可能给根挂 handler,届时 `propagate=True` 会让同一条记录冒泡到根被**重复输出 / 二次格式化**。关掉传播,组件日志完全由本系统 handler 掌控。(未 `setup_logging` 就独立调用 `core.config.load_config()` 的场景不受影响:那时没动过 `core` logger 的 propagate,仍走默认传播 / lastResort。)
 
 行为:
-- 在 `log_dir` 下建目录(**目录权限 `0o700`**),先执行**启动清理**(删 > retention_days 的旧日志)。
-- 解析级别:`level` 入参 > env `MANAGEWIDGETS_LOG_LEVEL` > 缺省 INFO。接受**大小写不敏感**的名称 `DEBUG/INFO/WARNING/ERROR/CRITICAL` 及对应整数字符串;**非法值回退 INFO**,并发一条 WARNING 记录说明回退。
+- 在 `log_dir` 下建目录;**无论目录是否已存在,都 `chmod(0o700)`**(回应评审 2-2)—— `mkdir(exist_ok=True)` 不会收紧已存在的宽权限目录,必须显式 chmod。随后执行**启动清理**(删 > retention_days 的旧日志)。
+- 解析级别:`level` 入参 > env `MANAGEWIDGETS_LOG_LEVEL` > 缺省 INFO。接受**大小写不敏感**的名称 `DEBUG/INFO/WARNING/ERROR/CRITICAL` 及对应整数字符串;**非法值回退 INFO**。解析函数返回 `(numeric_level, warning_or_None)`;**该回退 WARNING 必须在 handler 挂好之后**用组件 logger 发出(回应评审 2-4),否则会丢失或只进 lastResort。
 - 把组件 logger 级别设为解析出的数值级别,使记录能下发到 handler;各 handler 再按自身级别过滤。
 - 给该 **组件 logger** 挂两个 handler:
   - `TimedRotatingFileHandler` → `{component}.log`,级别 = 解析级别。
@@ -121,11 +121,12 @@ def setup_logging(component, *, log_dir=None, level=None, retention_days=None) -
 1. `setup_logging` 在指定 `log_dir` 建出 `{component}.log`,写一条 INFO 后**读文件**确认含该行。
 2. 级别:`level="WARNING"`(或 env)时 INFO 不落、WARNING 落。
 3. 幂等:连续调用两次,组件 logger 上本系统 handler 数不翻倍。
-4. **同进程隔离**(回应评审 1):同一进程先 `setup_logging("core", log_dir=tmp)` 再 `setup_logging("manager", log_dir=tmp)`,分别用 `core.x` / `manager.x` logger 各写一条,断言**各自只进各自文件、不串台**。
-5. **权限**(回应评审 2):`logs/` 目录为 `0o700`;`{component}.log` **非 world-readable**(`stat().st_mode & 0o077 == 0`)。
-6. **启动清理**:在 `log_dir` 造 `core.log.old`(mtime 8 天前)与近期文件;`setup_logging("core", retention_days=7)` 后旧的被删、近期保留;并确认**不删** `manager.log*` 之外的非本系统文件(造一个 `other.txt` 验证未被动)。
-7. `retention_days` 经 env `MANAGEWIDGETS_LOG_RETENTION_DAYS` 可覆盖;非整数 / ≤0 回退默认 7。
-8. **级别非法回退**(回应评审 5):`MANAGEWIDGETS_LOG_LEVEL="bogus"` → 实际级别为 INFO。
+4. **同进程隔离**(回应评审 1-1):同一进程先 `setup_logging("core", log_dir=tmp)` 再 `setup_logging("manager", log_dir=tmp)`,分别用 `core.x` / `manager.x` logger 各写一条,断言**各自只进各自文件、不串台**。
+5. **权限精确断言**(回应评审 2-2/2-3):预先 `mkdir(log_dir, 0o755)` 再 setup,断言目录 `stat().st_mode & 0o777 == 0o700`(证明对已存在目录也会收紧);断言 `{component}.log` 的 `st_mode & 0o777 == 0o600`(精确,不只是非 world-readable)。
+6. **轮转后权限**(回应评审 2-6):setup 后从 `getLogger(component).handlers` 取出本系统 file handler,调用 `doRollover()` 并再写一条,断言新建的 `{component}.log` 仍是 `0o600` —— 守住自定义 `_open` 确实覆盖轮转路径。
+7. **启动清理 + 不误删 + 清两端遗留**(回应评审 2-5):造 `core.log.old`(mtime 8 天前)、近期 `core.log`、过期 `manager.log.old`(mtime 8 天前)、以及非本系统文件 `other.log.old` / `notes.txt`。`setup_logging("core", retention_days=7)` 后:过期的 `core.log.old` **与** `manager.log.old` 都被删(证明两端遗留旧文件都清),近期文件保留,`other.log.old` / `notes.txt` **不动**(证明只认 `core.log*`/`manager.log*` 前缀)。
+8. `retention_days` 经 env `MANAGEWIDGETS_LOG_RETENTION_DAYS` 可覆盖;非整数 / ≤0 回退默认 7。
+9. **级别非法回退已落盘**(回应评审 2-4/5):`MANAGEWIDGETS_LOG_LEVEL="bogus"` → 实际级别为 INFO,且**读 `{component}.log`** 确认回退 WARNING 已写入文件(证明 warning 在 handler 挂好后才发)。
 
 埋点侧(回应评审 7,证明落盘链路完整而非仅 logger 被调用):在 `tests/test_core_integration.py` 先 `setup_logging("core", log_dir=tmp_path)`,跑 `BoomProvider` 触发 poll 异常,**读 `core.log`** 断言含 provider 名 / topic / 异常文本(`boom`)。
 
