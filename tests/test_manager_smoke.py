@@ -123,15 +123,28 @@ def test_overview_tray_close_sync_no_feedback_loop():
     assert calls == []                        # 程序化同步未回环
 
 
+def test_overview_tray_close_default_matches_close_behavior(monkeypatch):
+    # 偏好未设(None)时,真实关窗走 decide_close→"ask"(弹询问),并非静默收托盘。
+    # 故开关初始必须为「关」,否则新用户看到开关开着、点 × 却仍被询问,自相矛盾。
+    import manager.settings as settings
+    from manager.settings import decide_close
+    from manager.pages.overview import OverviewPage
+    monkeypatch.setattr(settings, "load_close_to_tray", lambda: None)
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
+                      on_autostart=lambda _e: None, on_tray_close=lambda _v: None)
+    assert ov._tray_close.get_active() is False           # 开关初始为关
+    assert decide_close(None) != "tray"                   # 与真实关窗行为(询问)一致
+
+
 def test_overview_tray_close_disabled_without_tray():
     # 无托盘(降级)时,关窗只能退出,托盘开关应置灰。
     from manager.pages.overview import OverviewPage
     ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
                       on_autostart=lambda _e: None, on_tray_close=lambda _v: None)
     ov.set_tray_available(False)
-    assert ov._tray_close._sensitive is False
+    assert ov._tray_close.get_switch_sensitive() is False
     ov.set_tray_available(True)
-    assert ov._tray_close._sensitive is True
+    assert ov._tray_close.get_switch_sensitive() is True
 
 
 def _classes(widget):

@@ -60,6 +60,9 @@ class PillSwitch(Gtk.DrawingArea):
         self._sensitive = bool(sensitive)
         self.queue_draw()
 
+    def get_switch_sensitive(self):
+        return self._sensitive
+
     # ---- 交互 ----
     def _on_click(self, _w, _e):
         if not self._sensitive:

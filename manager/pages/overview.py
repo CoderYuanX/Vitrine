@@ -1,6 +1,7 @@
 """概览页:状态横幅 + 配置告警 + 4 张指标卡 + 设置卡(原型 OVERVIEW 视图,设计规格 §4)。
 
-保留对外 API:OverviewPage(on_start,on_stop,on_autostart) / set_connection / update / set_autostart_active。
+保留对外 API:OverviewPage(on_start,on_stop,on_autostart,on_tray_close) / set_connection / update /
+set_autostart_active / set_tray_close_active / set_tray_available。
 连接态决定横幅外观、主按钮、指标是否显「—」。
 """
 import gi
@@ -193,10 +194,11 @@ class OverviewPage(Gtk.Box):
             self._autostart, divider=True)
 
         # 托盘行为:接 close_to_tray 偏好。开=关窗静默隐藏到托盘;关=关窗时直接退出。
-        # 偏好未设过(None)默认开(与关窗对话框的推荐项一致)。无托盘时由 set_tray_available 置灰。
+        # 仅 pref 明确为 True 时初始为开;未设(None)时关窗走「询问」(decide_close→"ask"),
+        # 故开关初始为关,避免开关显示开着、点 × 却仍被询问的矛盾。无托盘时由 set_tray_available 置灰。
         from manager.settings import load_close_to_tray
         self._on_tray_close = on_tray_close
-        self._tray_close = PillSwitch(active=load_close_to_tray() is not False)
+        self._tray_close = PillSwitch(active=load_close_to_tray() is True)
         self._tray_close_handler = self._tray_close.connect(
             "toggled", lambda _s, v: self._on_tray_close(v) if self._on_tray_close else None)
         row("托盘行为", "开启后关闭窗口仅隐藏到托盘、底座继续后台运行;关闭则点 × 时直接退出。",
