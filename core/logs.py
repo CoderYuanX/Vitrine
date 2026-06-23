@@ -1,4 +1,6 @@
 import logging
+import os
+from logging.handlers import TimedRotatingFileHandler
 
 _DEFAULT_RETENTION_DAYS = 7
 _NAME_LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
@@ -40,3 +42,15 @@ def _resolve_retention_days(explicit, env_value):
             return _DEFAULT_RETENTION_DAYS
         return n if n > 0 else _DEFAULT_RETENTION_DAYS
     return _DEFAULT_RETENTION_DAYS
+
+
+class _SecureTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """按天轮转,且初始与轮转新建文件都以 0o600 创建。
+
+    open() 的 opener 回调收 (path, flags)、用 os.open 以 0o600 创建并返回 fd
+    （不是把整个 _open 换成 os.open —— _open 需返回 stream 而非 fd）。
+    """
+
+    def _open(self):
+        return open(self.baseFilename, self.mode, encoding=self.encoding,
+                    opener=lambda path, flags: os.open(path, flags, 0o600))

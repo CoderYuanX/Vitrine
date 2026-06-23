@@ -44,3 +44,20 @@ def test_resolve_retention_default_invalid_and_override():
     assert _resolve_retention_days(-3, None) == 7
     assert _resolve_retention_days(14, None) == 14
     assert _resolve_retention_days(None, "10") == 10
+
+
+def test_secure_handler_initial_and_rollover_0600(tmp_path):
+    from core.logs import _SecureTimedRotatingFileHandler
+
+    p = tmp_path / "core.log"
+    h = _SecureTimedRotatingFileHandler(str(p), when="midnight", backupCount=7,
+                                        encoding="utf-8", delay=False)
+    try:
+        rec = logging.LogRecord("core.x", logging.INFO, __file__, 0, "msg", None, None)
+        h.emit(rec)
+        assert p.stat().st_mode & 0o777 == 0o600          # 初始文件
+        h.doRollover()
+        h.emit(rec)
+        assert p.stat().st_mode & 0o777 == 0o600          # 轮转新建文件
+    finally:
+        h.close()
