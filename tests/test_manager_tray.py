@@ -51,3 +51,14 @@ def test_tray_menu_callbacks_fire():
     assert calls == ["toggle", "start", "stop", "quit"]
     tray._item_autostart.set_active(True)          # 用户手动切换(未阻塞)→ 触发回调
     assert ("autostart", True) in calls
+
+
+def test_window_item_label_tracks_visibility():
+    # app 启动后窗口已 show_all,会立刻 refresh_window_item(True) → 文案应是「隐藏面板」;
+    # 隐藏后再切回「显示面板」。默认构造文案为「显示面板」(窗口尚未显示时的初值)。
+    tray = _tray([])
+    assert tray._item_window.get_label() == "显示面板"      # 构造初值
+    tray.refresh_window_item(True)                          # 窗口可见
+    assert tray._item_window.get_label() == "隐藏面板"
+    tray.refresh_window_item(False)                         # 窗口隐藏
+    assert tray._item_window.get_label() == "显示面板"

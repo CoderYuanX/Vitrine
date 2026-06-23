@@ -9,6 +9,12 @@
 ## 安装(其余依赖装进 venv)
     python3 -m venv --system-site-packages .venv
     .venv/bin/pip install psutil websockets tomli-w pytest
+    .venv/bin/pip install -e .     # 安装包本体,使 -m manager / -m core 在任意工作目录可用
+
+> **为何需要 `pip install -e .`**:开机自启的 `.desktop` 用 `Exec=<venv>/python -m manager`,
+> 登录拉起时工作目录通常不是仓库根目录。不安装包本体的话,`python -m manager` 会
+> `ModuleNotFoundError: No module named 'manager'`(只在仓库根目录才找得到)。装为可编辑包后
+> 在任意 cwd 都能解析,自启才可靠。
 
 ## 运行
     .venv/bin/python -m core       # 底座
