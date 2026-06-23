@@ -3,6 +3,7 @@ import time
 
 import pytest
 from websockets.sync.client import connect
+from websockets.exceptions import ConnectionClosed
 
 from core.config import Config
 from core.hub import Hub
@@ -134,6 +135,95 @@ def test_disable_provider_stops_topic():
                     drained = False
                     break
             assert drained
+    finally:
+        server.stop_threadsafe(); thread.join(timeout=5)
+
+
+def test_apply_effects_restarts_stops_and_starts_topic_tasks():
+    import asyncio
+
+    from core.hub import Conn
+    from core.server import CoreServer
+
+    async def run():
+        hub = Hub([TimeProvider()], Config.default(), token="secret")
+        server = CoreServer(hub, heartbeat=0)
+        server._loop = asyncio.get_running_loop()
+
+        server._start_topic("time.now")
+        original = server._tasks["time.now"]
+
+        interval_reply = hub.handle(Conn(authed=True), {
+            "id": "iv", "action": "set_interval",
+            "topic": "time.now", "interval": 0.5,
+        })
+        server._apply_effects(interval_reply)
+        restarted = server._tasks["time.now"]
+        await asyncio.sleep(0)
+
+        assert restarted is not original
+        assert original.cancelled()
+        assert not restarted.done()
+
+        disable_reply = hub.handle(Conn(authed=True), {
+            "id": "off", "action": "set_provider",
+            "provider": "time", "enabled": False,
+        })
+        server._apply_effects(disable_reply)
+        await asyncio.sleep(0)
+        assert server._tasks["time.now"].done()
+
+        enable_reply = hub.handle(Conn(authed=True), {
+            "id": "on", "action": "set_provider",
+            "provider": "time", "enabled": True,
+        })
+        server._apply_effects(enable_reply)
+        restarted_after_enable = server._tasks["time.now"]
+        assert not restarted_after_enable.done()
+
+        restarted_after_enable.cancel()
+        await asyncio.sleep(0)
+
+    asyncio.run(run())
+
+
+def test_concurrent_auth_gate_keeps_unauthorized_client_isolated():
+    server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
+    try:
+        with connect(f"ws://127.0.0.1:{port}") as good:
+            _hello(good)
+            with connect(f"ws://127.0.0.1:{port}") as bad:
+                bad.send(json.dumps({"id": "bad", "action": "list_providers"}))
+                reply = _recv(bad)
+                assert reply["code"] == "unauthorized"
+
+                with pytest.raises(ConnectionClosed):
+                    bad.recv(timeout=1)
+
+            good.send(json.dumps({"id": "ls", "action": "list_providers"}))
+            status = _recv_until(good, lambda m: m.get("type") == "status" and m.get("id") == "ls")
+            assert status["status"]["core"]["clients"] == 1
+    finally:
+        server.stop_threadsafe(); thread.join(timeout=5)
+
+
+def test_bad_token_rejects_and_closes_connection():
+    server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
+    try:
+        with connect(f"ws://127.0.0.1:{port}") as ws:
+            ws.send(json.dumps({"id": "h", "action": "hello", "token": "WRONG"}))
+            reply = _recv(ws)
+            assert reply["type"] == "error"
+            assert reply["code"] == "unauthorized"
+
+            with pytest.raises(ConnectionClosed):
+                ws.recv(timeout=1)
+
+        with connect(f"ws://127.0.0.1:{port}") as good:
+            _hello(good)
+            good.send(json.dumps({"id": "ls", "action": "list_providers"}))
+            status = _recv_until(good, lambda m: m.get("type") == "status" and m.get("id") == "ls")
+            assert status["status"]["core"]["clients"] == 1
     finally:
         server.stop_threadsafe(); thread.join(timeout=5)
 
