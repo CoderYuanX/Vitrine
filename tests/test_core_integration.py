@@ -138,6 +138,38 @@ def test_disable_provider_stops_topic():
         server.stop_threadsafe(); thread.join(timeout=5)
 
 
+def test_broadcast_removes_dead_connections():
+    # 广播时 send 失败(对端已断)的连接必须就地从 _conns 移除,
+    # 否则每次心跳/推送都对死连接做无效 send,直到 recv 循环才察觉。
+    import asyncio
+
+    from core.hub import Conn
+    from core.server import CoreServer
+
+    server = CoreServer(_hub())
+
+    class GoodWS:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, frame):
+            self.sent.append(frame)
+
+    class DeadWS:
+        async def send(self, frame):
+            raise ConnectionError("peer gone")
+
+    good, dead = GoodWS(), DeadWS()
+    server._conns[good] = Conn(authed=True)
+    server._conns[dead] = Conn(authed=True)
+
+    asyncio.run(server._broadcast_status())
+
+    assert dead not in server._conns                     # 死连接被清理
+    assert good in server._conns                          # 正常连接保留
+    assert len(good.sent) == 1                            # 正常连接照常收到
+
+
 def test_provider_error_broadcasts_status():
     hub = Hub([BoomProvider()], Config.default(), token="secret")
     server, thread, port = start_in_thread(hub, "127.0.0.1", 0)

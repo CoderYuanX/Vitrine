@@ -24,6 +24,8 @@ class CoreServer:
         self._server = None
         self._started_at = time.time()
         self._stop_event = None
+        import core
+        self._version = core.__version__                  # 缓存:避免每次心跳 _full_status 再 import
 
     def actual_port(self) -> int:
         return self._actual_port
@@ -81,24 +83,34 @@ class CoreServer:
         except asyncio.CancelledError:
             return
 
+    async def _send_authed(self, frame, topic=None):
+        # 向已鉴权(且按 topic 过滤后订阅了的)连接发帧;send 失败的连接就地清理,
+        # 不等 recv 循环察觉,避免对死连接反复无效 send
+        dead = []
+        for ws, conn in list(self._conns.items()):
+            if not conn.authed:
+                continue
+            if topic is not None and topic not in conn.subscriptions:
+                continue
+            try:
+                await ws.send(frame)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self._conns.pop(ws, None)
+
     async def _push(self, topic: str, value):
         frame = json.dumps({"type": "data", "topic": topic, "data": value, "ts": time.time()})
-        for ws, conn in list(self._conns.items()):
-            if conn.authed and topic in conn.subscriptions:
-                try:
-                    await ws.send(frame)
-                except Exception:
-                    pass
+        await self._send_authed(frame, topic=topic)
 
     def _full_status(self, notices=None) -> dict:
         # core 实时段由 server 组装(port/clients/uptime/version);providers 数组来自 hub
-        import core
         return {
             "core": {
                 "port": self._actual_port,
                 "clients": sum(1 for c in self._conns.values() if c.authed),
                 "uptime": time.time() - self._started_at,
-                "version": core.__version__,
+                "version": self._version,
                 "notices": notices if notices is not None else self._notices,
             },
             "providers": self._hub.providers_snapshot(),
@@ -106,12 +118,7 @@ class CoreServer:
 
     async def _broadcast_status(self):
         frame = json.dumps({"type": "status", "status": self._full_status()})
-        for ws, conn in list(self._conns.items()):
-            if conn.authed:
-                try:
-                    await ws.send(frame)
-                except Exception:
-                    pass
+        await self._send_authed(frame)
 
     def _apply_effects(self, reply):
         # 由 _handler 在收到 reply 后调用(同一事件循环内)
