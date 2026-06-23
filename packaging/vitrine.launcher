@@ -1,8 +1,0 @@
-#!/bin/sh
-# Vitrine 启动器:用 /opt/vitrine 自带的虚拟环境运行,避免污染系统 Python。
-PY=/opt/vitrine/venv/bin/python
-if [ ! -x "$PY" ]; then
-  echo "Vitrine:运行依赖尚未安装。请联网执行:sudo /opt/vitrine/setup-venv.sh" >&2
-  exit 1
-fi
-exec "$PY" /opt/vitrine/main.py "$@"

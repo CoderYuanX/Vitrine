@@ -1,1 +1,0 @@
-{"id": "calendar", "name": "日历", "qml": "Calendar.qml", "category": "calendar", "implemented": true, "defaultSize": [296, 172]}
