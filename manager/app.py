@@ -1,3 +1,4 @@
+import logging
 import sys
 
 import gi
@@ -17,6 +18,8 @@ from manager.settings import (
     save_close_to_tray,
 )
 from manager.supervisor import CoreSupervisor
+
+logger = logging.getLogger(__name__)
 
 
 class ManagerApp(Gtk.Application):
@@ -43,7 +46,8 @@ class ManagerApp(Gtk.Application):
         self._win = win
         win.set_default_size(1040, 680)
         self._overview = OverviewPage(on_start=self._sup.start_core, on_stop=self._sup.stop_core,
-                                      on_autostart=self._on_overview_autostart)
+                                      on_autostart=self._on_overview_autostart,
+                                      on_tray_close=self._on_overview_tray_close)
         self._datasources = DataSourcesPage(on_set_provider=self._sup.set_provider,
                                             on_set_interval=self._sup.set_interval)
         self._shell = MainShell({"overview": self._overview, "sources": self._datasources,
@@ -54,6 +58,7 @@ class ManagerApp(Gtk.Application):
         win.show_all()
 
         self._tray = self._build_tray()                   # 缺库 → None(降级)
+        self._overview.set_tray_available(self._tray is not None)  # 无托盘 → 概览「托盘行为」开关置灰
         if self._tray is not None:
             self.hold()                                   # 仅有托盘时 hold,隐藏窗口不退出
             self._held = True
@@ -74,11 +79,8 @@ class ManagerApp(Gtk.Application):
                 on_quit=self._quit,
                 autostart_enabled=is_autostart_enabled(),
             )
-        except Exception as exc:                          # 缺 AyatanaAppIndicator3 等 → 降级(任何托盘初始化失败都不该拖垮面板)
-            # 仍保留 catch-all 以兑现「缺库优雅降级」,但打全栈,避免把真实编程错误静默吞成「无托盘」
-            import traceback
-            print(f"[manager] 托盘不可用,降级为普通窗口: {exc}", file=sys.stderr)
-            traceback.print_exc()
+        except Exception:                                 # 缺 AyatanaAppIndicator3 等 → 降级
+            logger.warning("托盘不可用,降级为普通窗口", exc_info=True)
             return None
 
     def _on_close(self, *args):
@@ -110,10 +112,12 @@ class ManagerApp(Gtk.Application):
         if resp == Gtk.ResponseType.YES:
             if remember:
                 save_close_to_tray(True)
+                self._overview.set_tray_close_active(True)   # 与概览「托盘行为」开关双向同步
             self._hide_window()
         elif resp == Gtk.ResponseType.NO:
             if remember:
                 save_close_to_tray(False)
+                self._overview.set_tray_close_active(False)
             self._quit()
         # 其它(关掉对话框)→ 窗口保持,不动作
         return True
@@ -176,8 +180,8 @@ class ManagerApp(Gtk.Application):
         return False
 
     def _show_error(self, message):
+        logger.error("操作失败: %s", message)
         if self._win is None:
-            print(f"[manager] {message}", file=sys.stderr)
             return
         dlg = Gtk.MessageDialog(transient_for=self._win, modal=True,
                                 message_type=Gtk.MessageType.ERROR,
@@ -204,8 +208,14 @@ class ManagerApp(Gtk.Application):
         self._set_autostart(enabled)
         self._overview.set_autostart_active(enabled)
 
+    def _on_overview_tray_close(self, enabled):
+        # 概览「托盘行为」开关 → 落盘 close_to_tray 偏好(开=tray 静默隐藏,关=quit 直接退出)
+        save_close_to_tray(bool(enabled))
+
 
 def main(argv=None) -> int:
+    from core.logs import setup_logging
+    setup_logging("manager")
     app = ManagerApp()
     return app.run(argv if argv is not None else sys.argv)
 

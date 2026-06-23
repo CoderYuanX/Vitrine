@@ -159,3 +159,22 @@ def test_client_rejected_on_bad_token_then_state_reports():
     finally:
         client.stop()
         server.stop_threadsafe(); thread.join(timeout=5)
+
+
+def test_bad_token_logs_warning(caplog):
+    import logging
+    server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
+    try:
+        with caplog.at_level(logging.WARNING, logger="manager.ws_client"):
+            client = CoreClient("127.0.0.1", port, "WRONG",
+                                on_event=lambda m: None, on_state=lambda s: None)
+            client.start()
+            deadline = time.time() + 4
+            while time.time() < deadline and not any(
+                    r.name == "manager.ws_client" for r in caplog.records):
+                time.sleep(0.05)
+            client.stop()
+        assert any(r.name == "manager.ws_client" and r.levelno >= logging.WARNING
+                   for r in caplog.records)
+    finally:
+        server.stop_threadsafe(); thread.join(timeout=5)

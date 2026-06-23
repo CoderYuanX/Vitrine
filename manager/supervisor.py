@@ -1,9 +1,12 @@
+import logging
 import os
 import signal
 import subprocess
 import sys
 
 from core.config import default_config_path
+
+logger = logging.getLogger(__name__)
 from core.state import default_state_dir, pid_is_core, read_runtime
 from manager.discovery import discover
 from manager.ws_client import CoreClient
@@ -69,8 +72,8 @@ class CoreSupervisor:
         self._prev_started_at = rt.get("started_at") if rt else None   # 记旧实例时间戳
         try:
             subprocess.Popen([sys.executable, "-m", "core"])
-        except OSError as exc:                            # 拉起失败:回滚防重入标志,否则后续启动被永久挡住
-            print(f"[manager] 启动底座失败: {exc}", file=sys.stderr)
+        except OSError:                                   # 拉起失败:回滚防重入标志,否则后续启动被永久挡住
+            logger.exception("启动底座失败")
             self._start_polls_active = False
             self._on_state("disconnected")               # 未连上(非鉴权失败),概览/托盘置灰
             return
@@ -87,6 +90,7 @@ class CoreSupervisor:
             return False
         if self._start_polls >= 20:                       # ~10s 仍无新实例 → 放弃
             self._start_polls_active = False
+            logger.warning("底座启动超时,放弃重连")
             self._on_state("start_failed")               # 不再静默失败
             return False
         return True
@@ -113,6 +117,8 @@ class CoreSupervisor:
 
     def _handle_control_reply(self, reply):
         if reply.get("type") == "error":
+            logger.warning("控制操作被拒: code=%s message=%s",
+                           reply.get("code"), reply.get("message"))
             self._on_event(reply)                         # 经 on_event 的 error 分支回显
             self._request_status_refresh()
         return False
