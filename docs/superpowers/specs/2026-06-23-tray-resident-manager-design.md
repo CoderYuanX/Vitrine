@@ -69,10 +69,9 @@ tests/
 class TrayIndicator:
     def __init__(self, *, on_toggle_window, on_start_core, on_stop_core,
                  on_set_autostart, on_quit):
-        # 建 Indicator(id="org.managewidgets.Manager",
-        #   category=APPLICATION_STATUS, status=ACTIVE)
-        # set_icon_theme_path(<manager/assets 绝对路径>)
-        # set_icon_full("managewidgets-disconnected", "未连接")
+        # Indicator.new_with_path(id="org.managewidgets.Manager",
+        #   icon_name="managewidgets-disconnected", category=APPLICATION_STATUS,
+        #   icon_theme_path=<manager/assets/icons 绝对路径>);status=ACTIVE
         # 建 Gtk.Menu 并 set_menu(...)
     def set_connection(self, state: str, port: int | None = None) -> None
         # state ∈ {"connected","disconnected","error"};更新只读"连接状态"项文字
@@ -92,8 +91,11 @@ class TrayIndicator:
 6. ── 分隔 ──
 7. 退出(`on_quit`)
 
-图标:`set_icon_theme_path` 指向 `manager/assets` 绝对路径,`set_icon_full(name, desc)`
-在 `managewidgets-connected` / `managewidgets-disconnected` 间切。
+图标:用 **icon theme path + 图标名**(跨 dock 比绝对路径稳)。图标放在标准
+hicolor 结构 `manager/assets/icons/hicolor/scalable/apps/managewidgets-{connected,
+disconnected}.svg`,构造时 `Indicator.new_with_path(..., icon_theme_path=
+<manager/assets/icons 绝对路径>)`,切换时 `set_icon_full("managewidgets-connected" /
+"managewidgets-disconnected", desc)`。
 
 ### 3. `manager/app.py` —— 集成
 
@@ -140,12 +142,14 @@ class TrayIndicator:
 - `_on_event` 收到 `status` 帧时记录 `self._last_port = status["core"]["port"]`,
   并 `self._tray.set_connection(<当前态>, self._last_port)` 刷新端口显示。
 
-### 4. 图标资源 `manager/assets/*.svg`
+### 4. 图标资源(hicolor 结构)
 
-两个极简 SVG(一个圆点:已连接=绿、未连接=灰),仅供托盘区分状态。随包安装:
-`pyproject.toml` 的 `tool.setuptools` 增 `package-data`/`include-package-data`
-把 `manager/assets/*.svg` 纳入,运行时用 `importlib.resources`/`__file__` 定位绝对
-路径传给 `set_icon_theme_path`。
+两个极简 SVG(一个圆点:已连接=绿、未连接=灰),放标准 icon theme 路径:
+`manager/assets/icons/hicolor/scalable/apps/managewidgets-{connected,disconnected}.svg`。
+`pyproject.toml` 的 `tool.setuptools.package-data` 把它们纳入安装包;运行时用
+`__file__` 定位 `manager/assets/icons` 绝对路径,传给 `Indicator.new_with_path` 的
+`icon_theme_path`,图标名用 `managewidgets-connected`/`-disconnected`(标准 GtkIconTheme
+解析,跨 dock 稳)。
 
 ## 数据流
 
