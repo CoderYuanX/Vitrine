@@ -486,6 +486,21 @@ def test_reconnect_when_ready_waits_for_fresh_runtime(monkeypatch):
     assert app._reconnect_when_ready() is False  # 新 runtime → 停轮询
     assert reconnects == [1]                     # 以新 token 重连一次
     assert app._start_polls_active is False
+
+
+def test_reconnect_when_ready_gives_up_after_timeout(monkeypatch):
+    # 一直陈旧 runtime(started_at 未变)→ 轮询到上限(20)后放弃:停轮询且不重连
+    import manager.app as appmod
+    app = _app()
+    reconnects = []
+    app._reconnect = lambda: reconnects.append(1)
+    app._prev_started_at = 100.0
+    app._start_polls = 19                        # 下一次自增到 20 触发超时
+    app._start_polls_active = True
+    monkeypatch.setattr(appmod, "read_runtime", lambda p: {"started_at": 100.0})
+    assert app._reconnect_when_ready() is False  # 到上限 → 停轮询
+    assert reconnects == []                      # 超时不重连
+    assert app._start_polls_active is False
 ```
 
 - [ ] **Step 2: 运行确认失败**
@@ -779,7 +794,7 @@ if __name__ == "__main__":
 - [ ] **Step 5: 运行确认通过(冒烟 + 逻辑 + 全量回归)**
 
 Run: `.venv/bin/python -m pytest tests/test_manager_app_logic.py tests/test_manager_smoke.py -v`
-Expected: PASS(app 逻辑 5 例全过;冒烟含新 `test_overview_autostart_sync_no_feedback_loop`)
+Expected: PASS(app 逻辑 6 例全过;冒烟含新 `test_overview_autostart_sync_no_feedback_loop`)
 Run: `.venv/bin/python -m pytest -q`
 Expected: PASS(全过;无显示环境下 GUI 冒烟/托盘用例 SKIP,app 逻辑用例不依赖显示照常跑)
 
