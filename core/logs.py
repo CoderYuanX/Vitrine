@@ -1,10 +1,13 @@
 import logging
 import os
+import time
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
 _DEFAULT_RETENTION_DAYS = 7
 _NAME_LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
 _NUMERIC_LEVELS = {10, 20, 30, 40, 50}
+_LOG_PREFIXES = ("core.log", "manager.log")
 
 
 def _parse_level(raw):
@@ -42,6 +45,19 @@ def _resolve_retention_days(explicit, env_value):
             return _DEFAULT_RETENTION_DAYS
         return n if n > 0 else _DEFAULT_RETENTION_DAYS
     return _DEFAULT_RETENTION_DAYS
+
+
+def _cleanup_old_logs(log_dir, retention_days):
+    warnings = []
+    cutoff = time.time() - retention_days * 86400
+    for prefix in _LOG_PREFIXES:
+        for path in Path(log_dir).glob(prefix + "*"):
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink()
+            except OSError as exc:
+                warnings.append(f"failed to remove old log {path.name}: {exc}")
+    return warnings
 
 
 class _SecureTimedRotatingFileHandler(TimedRotatingFileHandler):

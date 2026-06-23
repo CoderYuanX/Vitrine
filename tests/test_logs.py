@@ -1,4 +1,7 @@
 import logging
+import os
+import time
+from pathlib import Path
 
 from core.logs import _resolve_level, _resolve_retention_days
 
@@ -61,3 +64,39 @@ def test_secure_handler_initial_and_rollover_0600(tmp_path):
         assert p.stat().st_mode & 0o777 == 0o600          # 轮转新建文件
     finally:
         h.close()
+
+
+def test_cleanup_deletes_old_keeps_recent_ignores_others(tmp_path):
+    from core.logs import _cleanup_old_logs
+
+    old = time.time() - 8 * 86400
+    for name in ("core.log.old", "manager.log.old", "other.log.old", "notes.txt"):
+        f = tmp_path / name
+        f.write_text("x")
+        os.utime(f, (old, old))
+    (tmp_path / "core.log").write_text("x")               # 近期文件
+
+    warnings = _cleanup_old_logs(tmp_path, 7)
+
+    names = {p.name for p in tmp_path.iterdir()}
+    assert "core.log.old" not in names                     # 两端过期都删
+    assert "manager.log.old" not in names
+    assert "core.log" in names                             # 近期保留
+    assert "other.log.old" in names and "notes.txt" in names   # 非本系统前缀不动
+    assert warnings == []
+
+
+def test_cleanup_failure_collected_not_raised(tmp_path, monkeypatch):
+    from core.logs import _cleanup_old_logs
+
+    old = time.time() - 8 * 86400
+    f = tmp_path / "core.log.old"
+    f.write_text("x")
+    os.utime(f, (old, old))
+
+    def boom(self, *a, **k):
+        raise OSError("nope")
+
+    monkeypatch.setattr(Path, "unlink", boom)
+    warnings = _cleanup_old_logs(tmp_path, 7)
+    assert any("core.log.old" in w for w in warnings)      # 失败被收集而非抛出
