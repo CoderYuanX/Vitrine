@@ -5,9 +5,11 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
+from manager import theme
 from manager.pages.datasources import DataSourcesPage
 from manager.pages.overview import OverviewPage
-from manager.pages.widgets_placeholder import WidgetsPlaceholderPage
+from manager.pages.widgets import WidgetsPage
+from manager.shell import MainShell
 from manager.settings import (
     autostart_exec_cmd,
     decide_close,
@@ -36,18 +38,17 @@ class ManagerApp(Gtk.Application):
             if self._tray:
                 self._tray.refresh_window_item(True)
             return
+        theme.apply()                                     # Soft Admin Blue 主题 + 随包字体
         win = Gtk.ApplicationWindow(application=self, title="小组件管理器")
         self._win = win
-        win.set_default_size(560, 460)
-        nb = Gtk.Notebook()
+        win.set_default_size(1040, 680)
         self._overview = OverviewPage(on_start=self._sup.start_core, on_stop=self._sup.stop_core,
                                       on_autostart=self._on_overview_autostart)
         self._datasources = DataSourcesPage(on_set_provider=self._sup.set_provider,
                                             on_set_interval=self._sup.set_interval)
-        nb.append_page(self._overview, Gtk.Label(label="概览"))
-        nb.append_page(self._datasources, Gtk.Label(label="数据源"))
-        nb.append_page(WidgetsPlaceholderPage(), Gtk.Label(label="小组件"))
-        win.add(nb)
+        self._shell = MainShell({"overview": self._overview, "sources": self._datasources,
+                                 "widgets": WidgetsPage()})
+        win.add(self._shell)
         win.connect("delete-event", self._on_close)       # 接管 ×,不直接销毁
         win.connect("window-state-event", self._on_window_state)  # 最小化 → 收进托盘,不留 dock 条目
         win.show_all()
@@ -157,7 +158,7 @@ class ManagerApp(Gtk.Application):
 
     # ---- 状态/事件回调(由 supervisor 触发,已切回主线程)----
     def _on_state(self, state):
-        self._overview.set_connection(state)
+        self._shell.set_connection(state)                 # 顶栏 chip + 侧栏状态 + 概览横幅
         if self._tray:
             self._tray.set_connection(state, self._last_port)
         return False
@@ -167,8 +168,7 @@ class ManagerApp(Gtk.Application):
             self._datasources.apply_data(msg["topic"], msg["data"])
         elif msg.get("type") == "status":
             self._last_port = msg["status"].get("core", {}).get("port")
-            self._overview.update(msg["status"])
-            self._datasources.update(msg["status"])
+            self._shell.update_status(msg["status"])      # 概览指标 + 数据源 + 侧栏 provider 计数
             if self._tray:
                 self._tray.set_connection("connected", self._last_port)
         elif msg.get("type") == "error":

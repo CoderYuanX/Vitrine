@@ -19,4 +19,8 @@ include = ["core*", "manager*"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-manager = ["assets/icons/hicolor/scalable/apps/*.svg"]
+manager = [
+    "assets/icons/hicolor/scalable/apps/*.svg",
+    "assets/style.css",
+    "assets/fonts/*.ttf",
+]

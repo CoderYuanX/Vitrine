@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 
@@ -15,11 +16,11 @@ pytestmark = pytest.mark.skipif(not HAS_DISPLAY, reason="需要图形显示")
 def test_pages_construct():
     from manager.pages.overview import OverviewPage
     from manager.pages.datasources import DataSourcesPage
-    from manager.pages.widgets_placeholder import WidgetsPlaceholderPage
+    from manager.pages.widgets import WidgetsPage
 
     ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None, on_autostart=lambda enabled: None)
     ds = DataSourcesPage(on_set_provider=lambda p, e: None, on_set_interval=lambda t, i: None)
-    wp = WidgetsPlaceholderPage()
+    wp = WidgetsPage()
     assert isinstance(ov, Gtk.Box) and isinstance(ds, Gtk.Box) and isinstance(wp, Gtk.Box)
 
 
@@ -46,7 +47,7 @@ def test_datasources_group_visible_after_update():
                     "last_ts": 1.0, "last_error": None}]}]})
     assert ds._switches["system"]["switch"].get_visible() is True   # 启用开关可见
     assert ds._groups["system"].get_visible() is True               # 组容器可见
-    assert ds._rows["system.cpu"]["spin"].get_visible() is True     # 间隔 SpinButton 可见
+    assert ds._rows["system.cpu"]["stepper"].get_visible() is True  # 间隔步进器可见
 
 
 def test_datasources_syncs_state_without_feedback_loop():
@@ -64,12 +65,12 @@ def test_datasources_syncs_state_without_feedback_loop():
 
     ds.update(snap(True, 1.0))
     sw = ds._switches["system"]["switch"]
-    spin = ds._rows["system.cpu"]["spin"]
-    assert sw.get_active() is True and spin.get_value() == 1.0
+    stepper = ds._rows["system.cpu"]["stepper"]
+    assert sw.get_active() is True and stepper.get_value() == 1.0
 
     ds.update(snap(False, 5.0))                           # provider 关掉、间隔改成 5s
     assert sw.get_active() is False                       # 开关已同步
-    assert spin.get_value() == 5.0                        # 间隔已同步
+    assert stepper.get_value() == 5.0                     # 间隔已同步
     assert prov_calls == [] and iv_calls == []            # 程序化同步未回环触发控制命令
 
 
@@ -95,3 +96,104 @@ def test_overview_autostart_sync_no_feedback_loop():
     ov.set_autostart_active(True)
     assert ov._autostart.get_active() is True
     assert calls == []                        # 程序化同步未回环触发 on_autostart
+
+
+def _classes(widget):
+    return set(widget.get_style_context().list_classes())
+
+
+def test_overview_banner_matches_prototype_structure():
+    # 原型中状态横幅本身就是彩色卡片,不再套一层白色 .mw-card。
+    from manager.pages.overview import OverviewPage
+
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
+                      on_autostart=lambda _enabled: None)
+    assert ov._banner.get_parent() is ov
+    assert "mw-banner" in _classes(ov._banner)
+    assert "mw-icon-tile" in _classes(ov._banner_tile)
+    ov.set_connection("connected")
+    assert "is-success" in _classes(ov._banner_tile)
+
+
+def test_widgets_empty_state_is_card_like_prototype():
+    from manager.pages.widgets import WidgetsPage
+
+    page = WidgetsPage()
+    assert "mw-card" in _classes(page._empty_card)
+    assert "mw-empty-card" in _classes(page._empty_card)
+    assert "is-brand" in _classes(page._empty_tile)
+
+
+def test_datasource_provider_icon_tile_has_brand_background():
+    from manager.pages.datasources import DataSourcesPage
+
+    ds = DataSourcesPage(on_set_provider=lambda _p, _e: None,
+                         on_set_interval=lambda _t, _i: None)
+    ds.update({"providers": [{"id": "system", "enabled": True, "status": "running",
+        "topics": [{"topic": "system.cpu", "interval": 1.0, "last_value": None,
+                    "last_ts": None, "last_error": None}]}]})
+    assert "mw-icon-tile" in _classes(ds._sections["system"]["tile"])
+    assert "is-brand" in _classes(ds._sections["system"]["tile"])
+
+
+def test_sidebar_footer_uses_full_width_status_container():
+    from manager.shell import Sidebar
+
+    side = Sidebar(on_nav=lambda _key: None)
+    assert "mw-sidebar-foot" in _classes(side._foot)
+    assert side._foot.get_halign() == Gtk.Align.FILL
+    assert side._foot.get_size_request()[1] == 52
+    assert side._foot_row.get_valign() == Gtk.Align.CENTER
+
+
+def test_overview_metric_grid_expands_like_prototype():
+    # 指标卡:横向等分铺满;高度随内容自然撑开(原型紧凑卡),内边距走 CSS .mw-metric-card,
+    # 不再固定卡高/子项高(此前固定 104 导致卡过高、内容上挤、底部留白)。
+    from manager.pages.overview import OverviewPage
+
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
+                      on_autostart=lambda _enabled: None)
+    assert ov._metric_grid.get_hexpand() is True
+    assert ov._metric_grid.get_halign() == Gtk.Align.FILL
+    for card in ov._metric_cards:
+        assert card.get_hexpand() is True
+        assert "mw-metric-card" in _classes(card)        # 内边距来自 CSS,非外部 margin
+        assert card.get_size_request()[1] == -1          # 不固定卡高 → 随内容
+        assert card.get_valign() == Gtk.Align.START       # 不被纵向拉伸
+    for _label, value, foot in ov._metric_widgets.values():
+        assert value.get_margin_top() == 6
+        assert foot.get_margin_top() == 4
+
+
+def test_theme_declares_chinese_font_fallback():
+    css = Path("manager/assets/style.css").read_text(encoding="utf-8")
+    assert "Source Han Sans SC" in css
+    assert "Noto Sans CJK SC" in css
+
+
+def test_theme_text_classes_have_explicit_prototype_font_tokens():
+    css = Path("manager/assets/style.css").read_text(encoding="utf-8")
+
+    def block(selector):
+        start = css.index(selector)
+        end = css.index("}", start)
+        return css[start:end]
+
+    expected = {
+        ".mw-brand-name": ("font-family:", "font-size: 14px", "font-weight: 700"),
+        ".mw-brand-sub": ("font-family:", "font-size: 11px", "font-weight: 400"),
+        ".mw-nav-btn": ("font-family:", "font-size: 13px", "font-weight: 600"),
+        ".mw-page-title": ("font-family:", "font-size: 18px", "font-weight: 700"),
+        ".mw-page-sub": ("font-family:", "font-size: 12px", "font-weight: 400"),
+        ".mw-metric-label": ("font-family:", "font-size: 12px", "font-weight: 400"),
+        ".mw-metric-value": ("font-family:", "font-size: 22px", "font-weight: 700"),
+        ".mw-metric-foot": ("font-family:", "font-size: 11px", "font-weight: 400"),
+        ".mw-btn-primary": ("font-family:", "font-size: 14px", "font-weight: 600"),
+        ".mw-btn-danger": ("font-family:", "font-size: 14px", "font-weight: 600"),
+        ".mw-h-14-600": ("font-family:", "font-size: 14px", "font-weight: 600"),
+        ".mw-sub-12": ("font-family:", "font-size: 12px", "font-weight: 400"),
+    }
+    for selector, tokens in expected.items():
+        b = block(selector)
+        for token in tokens:
+            assert token in b
