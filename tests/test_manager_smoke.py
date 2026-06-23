@@ -98,6 +98,42 @@ def test_overview_autostart_sync_no_feedback_loop():
     assert calls == []                        # 程序化同步未回环触发 on_autostart
 
 
+def test_overview_tray_close_toggle_invokes_callback():
+    # 「托盘行为」是真开关:用户切换 → 回调(app 据此落盘 close_to_tray 偏好)。
+    from manager.widgets.draw import PillSwitch
+    from manager.pages.overview import OverviewPage
+    calls = []
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
+                      on_autostart=lambda _e: None, on_tray_close=lambda v: calls.append(v))
+    assert isinstance(ov._tray_close, PillSwitch)          # 是开关,不再是静态文字
+    ov._tray_close.set_active(not ov._tray_close.get_active())
+    assert calls and isinstance(calls[-1], bool)           # 用户切换触发了回调
+
+
+def test_overview_tray_close_sync_no_feedback_loop():
+    # 关窗对话框「记住我的选择」回写开关时,程序化同步不得回环触发 on_tray_close。
+    from manager.pages.overview import OverviewPage
+    calls = []
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
+                      on_autostart=lambda _e: None, on_tray_close=lambda v: calls.append(v))
+    ov.set_tray_close_active(False)
+    assert ov._tray_close.get_active() is False
+    ov.set_tray_close_active(True)
+    assert ov._tray_close.get_active() is True
+    assert calls == []                        # 程序化同步未回环
+
+
+def test_overview_tray_close_disabled_without_tray():
+    # 无托盘(降级)时,关窗只能退出,托盘开关应置灰。
+    from manager.pages.overview import OverviewPage
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None,
+                      on_autostart=lambda _e: None, on_tray_close=lambda _v: None)
+    ov.set_tray_available(False)
+    assert ov._tray_close._sensitive is False
+    ov.set_tray_available(True)
+    assert ov._tray_close._sensitive is True
+
+
 def _classes(widget):
     return set(widget.get_style_context().list_classes())
 

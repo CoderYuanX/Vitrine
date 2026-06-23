@@ -139,7 +139,7 @@
   - 底座版本 `v0.1.0` / `data-base`
 - **设置卡**：两行，行间分隔。
   - 开机自启：标题 14/600 + 描述 12 muted + 右侧 iOS 风开关（`trackStyle/knobStyle`）。
-  - 托盘行为：标题 + 描述「关闭窗口仅隐藏面板…」+ 右侧「隐藏到托盘」标签（非开关，纯文案；可按现有 `close_to_tray` 偏好做成可点）。
+  - 托盘行为：标题 + 描述 + 右侧 iOS 风开关。**[增强，超出原型]** 原型此处是纯文案「隐藏到托盘」;经用户确认改为真开关,接 `close_to_tray` 偏好(开=关窗静默隐藏托盘 / 关=关窗直接退出),切换即 `save_close_to_tray` 落盘,与关窗对话框「记住我的选择」双向同步,无托盘时置灰。见 §12 增强轮次 1。
 
 ### 数据源页
 - **断连横幅**（`disconnected` 时）：danger 配色，「未连接到数据底座 / 控件已禁用…」+「启动底座」按钮。
@@ -247,6 +247,16 @@
 每片后跑 `pytest` 并截图（`docs/screenshots/`），漂移回写本文件 §12。
 
 ## 12. 漂移记录（编码阶段追加）
+
+### 功能增强轮次 1（2026-06-23，用户确认「托盘行为做成真开关」）
+- **区域**：概览页设置卡「托盘行为」行(§4)。**超出原型**(原型是纯文案 `<span>隐藏到托盘</span>`)。
+- **变更**：右侧静态文字 → `PillSwitch`,接后端 `close_to_tray` 偏好。
+  - 初值 = `load_close_to_tray()`(None 默认开,与关窗对话框推荐项一致)。
+  - 切换 → `OverviewPage(on_tray_close=…)` → `app._on_overview_tray_close` → `save_close_to_tray()` 落盘。
+  - 与关窗对话框「记住我的选择」**双向同步**(`set_tray_close_active`,阻塞信号防回环)。
+  - 无托盘(降级)时 `set_tray_available(False)` 置灰(关窗只能退出,开关无意义)。
+- **文件**：`manager/pages/overview.py`(开关+`set_tray_close_active`/`set_tray_available`)、`manager/app.py`(回调+落盘+对话框同步+置灰)。
+- **测试**:`tests/test_manager_smoke.py` 新增 3 例(切换触发回调 / 程序化同步防回环 / 无托盘置灰);`pytest` **120 passed**。
 
 ### 漂移修复轮次 1（2026-06-23，用户实机反馈「中间指标卡没对齐原型」）
 - **区域**：概览页 4 张 metric 卡（§4）。

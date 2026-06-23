@@ -28,17 +28,18 @@ def _fmt_uptime(t):
 
 
 class OverviewPage(Gtk.Box):
-    def __init__(self, on_start, on_stop, on_autostart):
+    def __init__(self, on_start, on_stop, on_autostart, on_tray_close=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         self.set_margin_top(24); self.set_margin_bottom(24)
         self.set_margin_start(24); self.set_margin_end(24)
         self._on_start, self._on_stop = on_start, on_stop
+
         self._state = "disconnected"
 
         self._build_banner()
         self._build_alert()
         self._build_metrics()
-        self._build_settings(on_autostart)
+        self._build_settings(on_autostart, on_tray_close)
         self._refresh_banner()
 
     # ---- 状态横幅 ----
@@ -161,7 +162,7 @@ class OverviewPage(Gtk.Box):
         self.pack_start(grid, False, True, 0)
 
     # ---- 设置卡 ----
-    def _build_settings(self, on_autostart):
+    def _build_settings(self, on_autostart, on_tray_close=None):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         card.get_style_context().add_class("mw-card")
 
@@ -190,9 +191,16 @@ class OverviewPage(Gtk.Box):
         self._autostart_handler = self._autostart.connect("toggled", lambda _s, v: on_autostart(v))
         row("开机自启", "登录桌面时自动启动数据底座（写入 autostart desktop 文件）",
             self._autostart, divider=True)
-        tray_lbl = Gtk.Label(label="隐藏到托盘"); tray_lbl.get_style_context().add_class("mw-h-13-600")
-        row("托盘行为", "关闭窗口仅隐藏面板，底座继续在后台运行。退出请使用托盘菜单。",
-            tray_lbl, divider=False)
+
+        # 托盘行为:接 close_to_tray 偏好。开=关窗静默隐藏到托盘;关=关窗时直接退出。
+        # 偏好未设过(None)默认开(与关窗对话框的推荐项一致)。无托盘时由 set_tray_available 置灰。
+        from manager.settings import load_close_to_tray
+        self._on_tray_close = on_tray_close
+        self._tray_close = PillSwitch(active=load_close_to_tray() is not False)
+        self._tray_close_handler = self._tray_close.connect(
+            "toggled", lambda _s, v: self._on_tray_close(v) if self._on_tray_close else None)
+        row("托盘行为", "开启后关闭窗口仅隐藏到托盘、底座继续后台运行;关闭则点 × 时直接退出。",
+            self._tray_close, divider=False)
         self.pack_start(card, False, False, 0)
 
     # ---- 对外 API ----
@@ -200,6 +208,16 @@ class OverviewPage(Gtk.Box):
         self._autostart.handler_block(self._autostart_handler)
         self._autostart.set_active(bool(enabled))
         self._autostart.handler_unblock(self._autostart_handler)
+
+    def set_tray_close_active(self, enabled):
+        # 与关窗对话框「记住我的选择」联动:程序化同步,阻塞信号防回环
+        self._tray_close.handler_block(self._tray_close_handler)
+        self._tray_close.set_active(bool(enabled))
+        self._tray_close.handler_unblock(self._tray_close_handler)
+
+    def set_tray_available(self, available):
+        # 无托盘(缺 AyatanaAppIndicator3 降级)时,关窗只能退出,托盘开关无意义 → 置灰
+        self._tray_close.set_switch_sensitive(bool(available))
 
     def set_connection(self, state):
         self._state = state if state in _BANNER else (
