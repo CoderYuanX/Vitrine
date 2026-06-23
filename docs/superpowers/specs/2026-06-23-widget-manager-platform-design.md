@@ -186,7 +186,8 @@
 ### 3.6 配置存储
 
 - 路径:`~/.config/managewidgets/config.toml`(可编辑、可持久)。
-- 内容:WebSocket 默认端口、各 provider 的 `enabled`、各 topic 的 `interval` 覆盖、自启状态。**不含运行时端口/pid**(那是 runtime 文件的职责,见 3.4)。
+- 内容:WebSocket 默认端口、各 provider 的 `enabled`、各 topic 的 `interval` 覆盖。**不含运行时端口/pid**(那是 runtime 文件的职责,见 3.4)。
+- **自启状态不存在 config.toml 里**,而以 XDG `~/.config/autostart/*.desktop` 文件的存在与否为单一事实来源(见 3.7),避免两处状态不一致。
 - 启动时读取,运行中被面板改动后写回。
 
 ### 3.7 进程:启动与停止语义

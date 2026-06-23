@@ -379,7 +379,7 @@ INTERVAL_MAX = 3600.0
 
 
 # 说明:自启状态以 XDG `~/.config/autostart/*.desktop` 文件为单一事实来源(见 Task 11),
-# 不在 config.toml 里重复保存,避免两处状态不一致。这一处细化了 spec §3.6。
+# 不在 config.toml 里重复保存,避免两处状态不一致(与 spec §3.6 一致)。
 @dataclass
 class Config:
     port: int = DEFAULT_PORT
@@ -1933,12 +1933,12 @@ class CoreClient:
             return
         with self._outlock:
             pending, self._outbox = self._outbox, []
-        for m in pending:
+        for i, m in enumerate(pending):
             try:
                 await self._ws.send(json.dumps(m))
             except Exception:
-                with self._outlock:                       # 发送失败 → 放回队首,待重连后重发
-                    self._outbox[:0] = [m]
+                with self._outlock:                       # 失败:当前 m + 剩余未发的整体放回队首(保序)
+                    self._outbox[:0] = pending[i:]
                 break
 
     def _run(self):
