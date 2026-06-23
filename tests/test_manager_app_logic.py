@@ -87,11 +87,15 @@ def test_reconnect_when_ready_waits_for_fresh_runtime(monkeypatch):
 
 
 def test_reconnect_when_ready_gives_up_after_timeout(monkeypatch):
-    # 一直陈旧 runtime(started_at 未变)→ 轮询到上限(20)后放弃:停轮询且不重连
+    # 一直陈旧 runtime(started_at 未变)→ 轮询到上限(20)后放弃:停轮询且不重连,
+    # 并给 UI 一个明确的启动失败终态。
     import manager.app as appmod
     app = _app()
     reconnects = []
     app._reconnect = lambda: reconnects.append(1)
+    states = []
+    app._overview = type("O", (), {"set_connection": lambda self, s: states.append(s)})()
+    app._tray = None
     app._prev_started_at = 100.0
     app._start_polls = 19                        # 下一次自增到 20 触发超时
     app._start_polls_active = True
@@ -99,6 +103,7 @@ def test_reconnect_when_ready_gives_up_after_timeout(monkeypatch):
     assert app._reconnect_when_ready() is False  # 到上限 → 停轮询
     assert reconnects == []                      # 超时不重连
     assert app._start_polls_active is False
+    assert states == ["start_failed"]             # 不再静默失败
 
 
 def test_minimize_hides_to_tray_only_when_tray_present():
@@ -134,3 +139,34 @@ def test_start_core_rolls_back_guard_on_popen_failure(monkeypatch):
     monkeypatch.setattr(appmod, "read_runtime", lambda p: None)
     app._start_core()
     assert again == [1]                           # 第二次真的尝试了
+
+
+def test_set_interval_reports_error_and_refreshes_status(monkeypatch):
+    import manager.app as appmod
+    app = _app()
+    sent = []
+    errors = []
+    app._show_error = lambda message: errors.append(message)
+    monkeypatch.setattr(appmod.GLib, "idle_add", lambda fn, *args: fn(*args))
+
+    class _Client:
+        def send(self, msg, on_reply=None):
+            sent.append((msg, on_reply))
+
+    app._client = _Client()
+    app._set_interval("system.cpu", 9999)
+    assert sent[0][0]["action"] == "set_interval"
+    assert sent[0][0]["id"].startswith("set-interval-")
+
+    sent[0][1]({"type": "error", "id": sent[0][0]["id"],
+                "code": "invalid_interval", "message": "interval must be valid"})
+    assert errors == ["interval must be valid"]
+    assert sent[1][0] == {"id": "refresh", "action": "list_providers"}
+
+
+def test_on_event_error_shows_message():
+    app = _app()
+    errors = []
+    app._show_error = lambda message: errors.append(message)
+    assert app._on_event({"type": "error", "code": "bad_request", "message": "bad input"}) is False
+    assert errors == ["bad input"]

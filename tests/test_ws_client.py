@@ -117,6 +117,34 @@ def test_stop_interrupts_reconnect_backoff():
     assert time.time() - t0 < 3                           # 远小于 backoff 上限,证明是被唤醒而非等满
 
 
+def test_pending_reply_errors_on_teardown():
+    # 带 on_reply 的请求在连接被拆除(此处:连到无人监听端口后 stop)时,
+    # 回调必须被以 error 兜底触发,且 _pending 清空 —— 否则面板的错误回显会永远等不到
+    import socket as _socket
+    _s = _socket.socket()
+    _s.bind(("127.0.0.1", 0))
+    dead_port = _s.getsockname()[1]
+    _s.close()
+    replies = []
+    lock = threading.Lock()
+
+    def on_reply(m):
+        with lock:
+            replies.append(m)
+
+    client = CoreClient("127.0.0.1", dead_port, "secret",
+                        on_event=lambda m: None, on_state=lambda s: None)
+    client.start()
+    client.send({"id": "si", "action": "set_interval", "topic": "system.cpu", "interval": 1.0},
+                on_reply=on_reply)
+    time.sleep(0.4)                                       # 让它进入重连退避(始终连不上)
+    client.stop()
+    with lock:
+        assert len(replies) == 1                          # 回调被兜底触发一次
+        assert replies[0].get("type") == "error"          # 以 error 形式
+    assert not client._pending                            # 无悬挂回调
+
+
 def test_client_rejected_on_bad_token_then_state_reports():
     server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
     states = []

@@ -31,6 +31,7 @@ class ManagerApp(Gtk.Application):
         self._tray = None
         self._held = False
         self._last_port = None
+        self._request_seq = 0
 
     # ---- 生命周期 ----
     def do_activate(self):
@@ -188,7 +189,40 @@ class ManagerApp(Gtk.Application):
             self._datasources.update(msg["status"])
             if self._tray:
                 self._tray.set_connection("connected", self._last_port)
+        elif msg.get("type") == "error":
+            self._show_error(msg.get("message") or msg.get("code") or "操作失败")
         return False
+
+    def _show_error(self, message):
+        if self._win is None:
+            print(f"[manager] {message}", file=sys.stderr)
+            return
+        dlg = Gtk.MessageDialog(transient_for=self._win, modal=True,
+                                message_type=Gtk.MessageType.ERROR,
+                                buttons=Gtk.ButtonsType.OK,
+                                text="操作失败")
+        dlg.format_secondary_text(str(message))
+        dlg.run()
+        dlg.destroy()
+
+    def _next_request_id(self, prefix):
+        self._request_seq += 1
+        return f"{prefix}-{self._request_seq}"
+
+    def _request_status_refresh(self):
+        if self._client:
+            self._client.send({"id": "refresh", "action": "list_providers"})
+
+    def _handle_control_reply(self, reply):
+        if reply.get("type") == "error":
+            self._show_error(reply.get("message") or reply.get("code") or "操作失败")
+            self._request_status_refresh()
+        return False
+
+    def _send_control(self, msg):
+        if not self._client:
+            return
+        self._client.send(msg, on_reply=lambda reply: GLib.idle_add(self._handle_control_reply, reply))
 
     # ---- 启停底座 ----
     def _maybe_autostart_core(self):
@@ -222,6 +256,7 @@ class ManagerApp(Gtk.Application):
             return False
         if self._start_polls >= 20:                       # ~10s 仍无新实例 → 放弃
             self._start_polls_active = False
+            self._on_state("start_failed")
             return False
         return True
 
@@ -243,12 +278,12 @@ class ManagerApp(Gtk.Application):
 
     # ---- provider/interval ----
     def _set_provider(self, pid, enabled):
-        if self._client:
-            self._client.send({"action": "set_provider", "provider": pid, "enabled": enabled})
+        self._send_control({"id": self._next_request_id("set-provider"),
+                            "action": "set_provider", "provider": pid, "enabled": enabled})
 
     def _set_interval(self, topic, interval):
-        if self._client:
-            self._client.send({"action": "set_interval", "topic": topic, "interval": interval})
+        self._send_control({"id": self._next_request_id("set-interval"),
+                            "action": "set_interval", "topic": topic, "interval": interval})
 
     # ---- 自启(改为自启面板 -m manager;概览与托盘联动)----
     def _set_autostart(self, enabled):
