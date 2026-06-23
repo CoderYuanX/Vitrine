@@ -1,9 +1,12 @@
 import asyncio
 import json
+import logging
 import threading
 import time
 
 import websockets
+
+logger = logging.getLogger(__name__)
 
 from core.hub import Conn, Hub
 
@@ -36,10 +39,13 @@ class CoreServer:
         try:                                              # 端口回退:占用→交给 OS 选端口
             server = await websockets.serve(self._handler, self._host, self._port)
         except OSError:
+            logger.warning("preferred port %s unavailable, falling back to OS-assigned",
+                           self._port)
             server = await websockets.serve(self._handler, self._host, 0)
         try:
             self._server = server
             self._actual_port = server.sockets[0].getsockname()[1]
+            logger.info("core server listening on %s:%s", self._host, self._actual_port)
             for topic in self._hub.topics():
                 if self._hub.is_active(topic):
                     self._start_topic(topic)
@@ -77,6 +83,8 @@ class CoreServer:
                     self._hub.record(topic, value, ts=time.time())
                     await self._push(topic, value)
                 except Exception as exc:                 # provider 采集异常:记错,不杀循环
+                    logger.exception("provider %s poll %s failed",
+                                     self._hub.provider_id_of(topic), topic)
                     self._hub.record(topic, None, ts=time.time(), error=str(exc))
                     await self._broadcast_status()       # 立即让面板看到错误态,不等心跳
                 await asyncio.sleep(self._hub.interval(topic))

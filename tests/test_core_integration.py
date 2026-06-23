@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 
 import pytest
@@ -278,3 +279,28 @@ def test_provider_error_broadcasts_status():
             assert boom["topics"][0]["last_error"] is not None
     finally:
         server.stop_threadsafe(); thread.join(timeout=5)
+
+
+def test_provider_poll_error_written_to_log(tmp_path):
+    from core import logs
+
+    logs.setup_logging("core", log_dir=tmp_path)
+    log_path = tmp_path / "core.log"
+    hub = Hub([BoomProvider()], Config.default(), token="secret")
+    server, thread, port = start_in_thread(hub, "127.0.0.1", 0)
+    try:
+        deadline = time.time() + 4
+        while time.time() < deadline:
+            if log_path.exists() and "boom.x" in log_path.read_text():
+                break
+            time.sleep(0.1)
+        text = log_path.read_text()
+        assert "boom" in text          # provider id + 异常文本
+        assert "boom.x" in text        # topic
+        assert "Traceback" in text     # 堆栈
+    finally:
+        server.stop_threadsafe(); thread.join(timeout=5)
+        lg = logging.getLogger("core")                     # 还原,避免污染同文件其它用例
+        for h in [h for h in lg.handlers if getattr(h, "_managewidgets", False)]:
+            lg.removeHandler(h); h.close()
+        lg.propagate = True
