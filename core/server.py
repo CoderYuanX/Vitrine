@@ -166,8 +166,11 @@ class CoreServer:
             self._stop_event.set()
 
     def stop_threadsafe(self) -> None:
-        if self._loop:
-            self._loop.call_soon_threadsafe(lambda: self._stop_event.set())
+        if self._loop and not self._loop.is_closed():
+            try:
+                self._loop.call_soon_threadsafe(lambda: self._stop_event.set())
+            except RuntimeError:
+                pass
 
 
 def start_in_thread(hub: Hub, host: str = "127.0.0.1", port: int = 0, heartbeat: float = 2.0):
