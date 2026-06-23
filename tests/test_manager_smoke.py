@@ -17,7 +17,7 @@ def test_pages_construct():
     from manager.pages.datasources import DataSourcesPage
     from manager.pages.widgets_placeholder import WidgetsPlaceholderPage
 
-    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None)
+    ov = OverviewPage(on_start=lambda: None, on_stop=lambda: None, on_autostart=lambda enabled: None)
     ds = DataSourcesPage(on_set_provider=lambda p, e: None, on_set_interval=lambda t, i: None)
     wp = WidgetsPlaceholderPage()
     assert isinstance(ov, Gtk.Box) and isinstance(ds, Gtk.Box) and isinstance(wp, Gtk.Box)

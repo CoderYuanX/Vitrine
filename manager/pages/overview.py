@@ -5,7 +5,7 @@ from gi.repository import Gtk
 
 
 class OverviewPage(Gtk.Box):
-    def __init__(self, on_start, on_stop):
+    def __init__(self, on_start, on_stop, on_autostart):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.set_border_width(20)
         self._conn = Gtk.Label(label="未连接", xalign=0)
@@ -21,6 +21,14 @@ class OverviewPage(Gtk.Box):
         btns.pack_start(stop_btn, False, False, 0)
         for w in (self._conn, self._info, self._notices, btns):
             self.pack_start(w, False, False, 0)
+        self._autostart = Gtk.Switch()
+        from core.autostart import is_autostart_enabled
+        self._autostart.set_active(is_autostart_enabled())
+        self._autostart.connect("notify::active", lambda s, _p: on_autostart(s.get_active()))
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.pack_start(Gtk.Label(label="开机自启", xalign=0), False, False, 0)
+        row.pack_start(self._autostart, False, False, 0)
+        self.pack_start(row, False, False, 0)
 
     def set_connection(self, state):
         self._conn.set_text({"connected": "已连接", "disconnected": "未连接",

@@ -26,7 +26,7 @@ class ManagerApp(Gtk.Application):
         win = Gtk.ApplicationWindow(application=self, title="小组件管理器")
         win.set_default_size(560, 460)
         nb = Gtk.Notebook()
-        self._overview = OverviewPage(on_start=self._start_core, on_stop=self._stop_core)
+        self._overview = OverviewPage(on_start=self._start_core, on_stop=self._stop_core, on_autostart=self._toggle_autostart)
         self._datasources = DataSourcesPage(on_set_provider=self._set_provider,
                                             on_set_interval=self._set_interval)
         nb.append_page(self._overview, Gtk.Label(label="概览"))
@@ -101,6 +101,13 @@ class ManagerApp(Gtk.Application):
     def _set_interval(self, topic, interval):
         if self._client:
             self._client.send({"action": "set_interval", "topic": topic, "interval": interval})
+
+    def _toggle_autostart(self, enabled):
+        from core.autostart import disable_autostart, enable_autostart
+        if enabled:
+            enable_autostart(f"{sys.executable} -m core")
+        else:
+            disable_autostart()
 
     def _shutdown_client(self):
         if self._client:
