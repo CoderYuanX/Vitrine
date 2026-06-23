@@ -1,3 +1,4 @@
+import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -6,6 +7,8 @@ from pathlib import Path
 
 import tomllib
 import tomli_w
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PORT = 35355
 INTERVAL_MIN = 0.5
@@ -64,6 +67,8 @@ def load_config(path: Path) -> tuple[Config, list[dict]]:
             "code": "config_reset",
             "message": f"配置文件损坏,已重置;原文件备份为 {backup.name if backup else '(备份失败)'}",
         }
+        logger.warning("config corrupt, reset; backup=%s",
+                       backup.name if backup else "(backup failed)")
         return Config.default(), [notice]
 
 
