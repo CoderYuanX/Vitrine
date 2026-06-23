@@ -1861,6 +1861,36 @@ def test_send_before_connect_is_queued_and_delivered():
         server.stop_threadsafe(); thread.join(timeout=5)
 
 
+def test_subscribe_after_connected_takes_effect():
+    # 显式覆盖 subscribe() 的"已连接 → 立即补订"分支
+    server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
+    events = []
+    lock = threading.Lock()
+    states = []
+    client = CoreClient("127.0.0.1", port, "secret",
+                        on_event=lambda m: (lock.acquire(), events.append(m), lock.release()),
+                        on_state=lambda s: states.append(s))
+    client.start()                                       # 注意:连接前不订阅任何 topic
+    try:
+        deadline = time.time() + 4
+        while time.time() < deadline and not client.is_connected():
+            time.sleep(0.05)
+        assert client.is_connected()                     # 已连接
+        client.subscribe(["system.cpu"])                 # 连接后才订阅 → 走即时补订分支
+        got = False
+        deadline = time.time() + 4
+        while time.time() < deadline:
+            with lock:
+                got = any(m.get("type") == "data" and m.get("topic") == "system.cpu" for m in events)
+            if got:
+                break
+            time.sleep(0.1)
+        assert got                                        # 补订生效,收到 system.cpu 数据
+    finally:
+        client.stop()
+        server.stop_threadsafe(); thread.join(timeout=5)
+
+
 def test_stop_interrupts_reconnect_backoff():
     import socket as _socket
     # 动态取一个空闲端口再关闭,确保无人监听(比硬编码 127.0.0.1:1 更稳)
@@ -2031,7 +2061,7 @@ class CoreClient:
 - [ ] **Step 8: 运行确认通过**
 
 Run: `.venv/bin/python -m pytest tests/test_ws_client.py tests/test_discovery.py -v`
-Expected: PASS（7 passed）
+Expected: PASS（8 passed）
 
 - [ ] **Step 9: 提交**
 
