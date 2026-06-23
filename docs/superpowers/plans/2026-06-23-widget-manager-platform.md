@@ -1730,10 +1730,10 @@ git commit -m "feat(core): 底座入口 实例锁/runtime/优雅停止/配置持
   - `manager/discovery.py`:`discover(runtime_path: Path, config_path: Path) -> tuple[str, int, str | None]` 返回 `(host, port, token)`;优先 runtime(`core.json` 的 port+token),否则回退 config 默认端口(token=None);两者皆缺时回退 `("127.0.0.1", DEFAULT_PORT, None)`
   - `manager/ws_client.py`:`class CoreClient`
     - `__init__(self, host, port, token, on_event, on_state)`:`on_event(dict)`/`on_state(str)` 由调用方负责切回 GTK 主线程
-    - `start()`:起后台线程跑 asyncio loop,连后先发 `hello`+token,再回放调用方设定的订阅;断线指数退避重连(0.5→1→2→…→最多 10s)
+    - `start()`:起后台线程跑 asyncio loop,连后先发 `hello`+token,再回放调用方设定的订阅;断线指数退避重连(0.5→1→2→…→最多 10s),**退避用可唤醒的 `asyncio.Event` 等待而非裸 `sleep`,以便 `stop()` 立即打断**
     - `subscribe(topics: list[str])`、`send(msg: dict, on_reply=None)`:线程安全;**消息入待发队列,未连上/重连中不丢,连上(hello ok)后统一 flush**;`subscribe` 另记入 `self._subs` 供每次重连后重订阅
     - `is_connected() -> bool`:是否已鉴权连上(供面板"停止底座"决定走 WS shutdown 还是 SIGTERM 兜底)
-    - `stop()`:停 loop、关连接、join 线程
+    - `stop()`:置 `_stop`、`call_soon_threadsafe` **唤醒退避 `_wake` 并关连接**、`join` 线程(不留悬挂 daemon,即便正处于重连退避)
     - 回包关联:带 `id` 的请求,其 `ok`/`error` 响应据 `id` 回调 `on_reply`
 
 - [ ] **Step 1: 写失败测试 `tests/test_discovery.py`**
@@ -1860,6 +1860,18 @@ def test_send_before_connect_is_queued_and_delivered():
         server.stop_threadsafe(); thread.join(timeout=5)
 
 
+def test_stop_interrupts_reconnect_backoff():
+    # 连一个没人监听的端口 → client 进入重连退避;stop() 必须能立刻唤醒并让线程退出
+    client = CoreClient("127.0.0.1", 1, "secret", on_event=lambda m: None, on_state=lambda s: None)
+    client.start()
+    time.sleep(0.4)                                       # 让它至少进入一次退避等待
+    t0 = time.time()
+    client.stop()                                         # 内部 join(timeout=5)
+    assert client._thread is not None
+    assert not client._thread.is_alive()                 # 线程已退出,无悬挂 daemon
+    assert time.time() - t0 < 3                           # 远小于 backoff 上限,证明是被唤醒而非等满
+
+
 def test_client_rejected_on_bad_token_then_state_reports():
     server, thread, port = start_in_thread(_hub(), "127.0.0.1", 0)
     states = []
@@ -1902,6 +1914,7 @@ class CoreClient:
         self._thread = None
         self._ws = None
         self._stop = False
+        self._wake = None                                 # asyncio.Event,用于打断重连退避(stop 时唤醒)
         self._connected = False                           # 是否已鉴权连上(供面板停止决策)
         self._subs = set()
         self._pending = {}                                # id -> on_reply
@@ -1946,6 +1959,7 @@ class CoreClient:
 
     async def _main(self):
         self._loop = asyncio.get_running_loop()
+        self._wake = asyncio.Event()
         backoff = 0.5
         while not self._stop:
             try:
@@ -1982,17 +1996,23 @@ class CoreClient:
                 self._connected = False
             if self._stop:
                 break
-            await asyncio.sleep(backoff)
+            try:                                          # 可被 stop() 唤醒的退避等待(替代裸 sleep)
+                await asyncio.wait_for(self._wake.wait(), timeout=backoff)
+            except asyncio.TimeoutError:
+                pass
+            self._wake.clear()
             backoff = min(backoff * 2, 10)
 
     def stop(self):
         self._stop = True
         if self._loop:
-            async def _close():
+            def _wake_and_close():
+                if self._wake is not None:               # 唤醒退避中的 sleep,立即退出循环
+                    self._wake.set()
                 if self._ws is not None:
-                    await self._ws.close()
+                    self._loop.create_task(self._ws.close())
             try:
-                self._loop.call_soon_threadsafe(lambda: self._loop.create_task(_close()))
+                self._loop.call_soon_threadsafe(_wake_and_close)
             except Exception:
                 pass
         if self._thread:
@@ -2002,7 +2022,7 @@ class CoreClient:
 - [ ] **Step 8: 运行确认通过**
 
 Run: `.venv/bin/python -m pytest tests/test_ws_client.py tests/test_discovery.py -v`
-Expected: PASS（6 passed）
+Expected: PASS（7 passed）
 
 - [ ] **Step 9: 提交**
 
